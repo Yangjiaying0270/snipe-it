@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Enums\CheckoutRequestApprovalStatus;
+use App\Enums\CheckoutRequestState;
 use App\Models\Accessory;
 use App\Models\Asset;
 use App\Models\AssetModel;
@@ -226,6 +228,41 @@ class AuthServiceProvider extends ServiceProvider
                 || $user->can('checkout', License::class);
         });
 
+        // Admission gate for the pending-request queue. Approvers
+        // without checkout rights still need to reach the requests
+        // assigned to them, and the warehouse admin needs the rows
+        // that already passed approval.
+        Gate::define('viewPendingRequests', function ($user) {
+            if ($user->isSuperUser()) {
+                return true;
+            }
+
+            if ((int) $user->id === (int) config('checkout_request.warehouse_admin_id')) {
+                return true;
+            }
+
+            if ($user->can('canCheckoutAtLeastOneItemType')) {
+                return true;
+            }
+
+            return CheckoutRequest::query()
+                ->where('approver_id', $user->id)
+                ->where('state', CheckoutRequestState::Pending->value)
+                ->where('approval_status', CheckoutRequestApprovalStatus::Pending->value)
+                ->exists();
+        });
+
+        // 归还请求队列：仅超级用户与仓库管理员可见。审批人Gate
+        // （viewPendingRequests）不适用——归还申请没有审批环节，
+        // 直接由仓库签入兑现。
+        Gate::define('viewReturnRequests', function ($user) {
+            if ($user->isSuperUser()) {
+                return true;
+            }
+
+            return (int) $user->id === (int) config('checkout_request.warehouse_admin_id');
+        });
+
         // True when the user has any read access to a "fleet item or
         // person" the app treats as first-class inventory. Powers the
         // calendar sidenav gate, the dashboard's coarse admission
@@ -380,7 +417,10 @@ class AuthServiceProvider extends ServiceProvider
             }
 
             return $user->can('audit', Asset::class)
-                || $user->hasAccess('reports.view');
+                || $user->hasAccess('reports.view')
+                // 可申请资产的用户需要在「申请资产」弹窗里选择申请地址和
+                // 审批人，因此也允许其使用 selectlist 下拉接口。
+                || $user->hasAccess('assets.view.requestable');
         });
 
         // This determines whether the user can edit their profile based on the setting in Admin > General

@@ -91,24 +91,29 @@ trait Requestable
     public function scopeRequestedBy($query, User $user)
     {
         return $query->whereHas(
-            'requests', function ($query) use ($user) {
+            'requests',
+            function ($query) use ($user) {
                 $query->where('user_id', $user->id);
             }
         );
     }
 
-    public function request($qty = 1, $startDate = null, $endDate = null, $notes = null)
+    public function request($qty, $startDate, $endDate, $notes, $location_id, $approver_id, $checkout_reason = null)
     {
-        $this->requests()->save(
-            new CheckoutRequest([
-                'user_id' => auth()->id(),
-                'quantity' => $qty,
-                'start_date' => $startDate,
-                'end_date' => $endDate,
-                'notes' => $notes,
-                'state' => CheckoutRequestState::Pending->value,
-            ])
-        );
+        $model = new CheckoutRequest([
+            'user_id' => auth()->id(),
+            'quantity' => $qty,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'notes' => $notes,
+            'checkout_location_id' => $location_id,
+            'approver_id' => $approver_id,
+            'checkout_reason' => $checkout_reason,
+            'state' => CheckoutRequestState::Pending->value,
+        ]);
+        $this->requests()->save($model);
+
+        return $model;
     }
 
     public function deleteRequest()

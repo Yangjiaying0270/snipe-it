@@ -8,9 +8,11 @@ use App\Models\Actionlog;
 use App\Models\Asset;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\UserNotification;
 use App\Notifications\CurrentInventory;
 use App\Rules\CssColor;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -316,5 +318,28 @@ class ProfileController extends Controller
 
         return redirect()->back()->with('error', trans('general.file_does_not_exist'));
 
+    }
+
+    /**
+     * 把当前用户的站内通知全部标记为已读（登录提醒弹窗关闭时调用）。
+     */
+    public function markNotificationsRead(): JsonResponse
+    {
+        UserNotification::markAllReadFor((int) auth()->id());
+
+        return response()->json(['status' => 'success']);
+    }
+
+    /**
+     * 消息列表：当前用户收到的全部站内通知（含已读），按时间倒序分页。
+     * 登录弹窗只展示未读，这里是完整历史。
+     */
+    public function notifications(): View
+    {
+        $notifications = UserNotification::where('user_id', auth()->id())
+            ->orderByDesc('created_at')
+            ->paginate(20);
+
+        return view('account/notifications', compact('notifications'));
     }
 }

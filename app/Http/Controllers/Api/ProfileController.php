@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\CheckoutRequestApprovalStatus;
+use App\Enums\CheckoutRequestState;
 use App\Helpers\Helper;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\CheckForTwoFactor;
@@ -50,16 +52,11 @@ class ProfileController extends Controller
      */
     public function requestedAssets(): array
     {
-        // Only surface OPEN (pending) requests. `state` is the
-        // source of truth for lifecycle - canceled_at + fulfilled_at
-        // still populate alongside their state transitions (WHEN,
-        // paired with the WHAT in state) but consumers should
-        // always filter on state, not on the datetime columns. A
-        // whereNull('canceled_at') filter would miss fulfilled
-        // rows entirely, which have no canceled_at set but are
-        // just as done.
+        // 我的申请：展示该用户全部申请历史（含已撤销、已完成），
+        // 不再只过滤 pending。`state` 是生命周期的唯一真相来源。
         $checkoutRequests = CheckoutRequest::where('user_id', '=', auth()->id())
-            ->pending()
+            ->with(['checkoutLocation', 'approver'])
+            ->orderByDesc('created_at')
             ->get();
 
         $results = [];
@@ -78,6 +75,28 @@ class ProfileController extends Controller
 
             // Make sure the asset and request still exist
             if ($checkoutRequest && $checkoutRequest->itemRequested()) {
+
+                // 状态展示优先级：已撤销 > 已完成 > approval_status
+                if ($checkoutRequest->state === CheckoutRequestState::Canceled) {
+                    $statusLabel = '已撤销';
+                    $statusColor = 'default';
+                } elseif ($checkoutRequest->state === CheckoutRequestState::Fulfilled) {
+                    $statusLabel = '已完成';
+                    $statusColor = 'success';
+                } else {
+                    $statusLabel = $checkoutRequest->approval_status->label();
+                    $statusColor = $checkoutRequest->approval_status->color();
+                }
+
+                // 仅待审批/已退回 的申请可被申请人修改或取消；
+                // 已批准、已完成、已撤销、已失效 均不可操作。
+                $canModifyOrCancel = $checkoutRequest->state === CheckoutRequestState::Pending
+                    && in_array(
+                        $checkoutRequest->approval_status,
+                        [CheckoutRequestApprovalStatus::Pending, CheckoutRequestApprovalStatus::Rejected],
+                        true
+                    );
+
                 $assets = [
                     'id' => (int) $checkoutRequest->id,
                     'image' => e($checkoutRequest->itemRequested()->present()->getImageUrl()),
@@ -85,8 +104,20 @@ class ProfileController extends Controller
                     'type' => e($checkoutRequest->itemType()),
                     'qty' => (int) $checkoutRequest->quantity,
                     'location' => ($checkoutRequest->location()) ? e($checkoutRequest->location()->name) : null,
+                    'checkout_location' => $checkoutRequest->checkoutLocation ? e($checkoutRequest->checkoutLocation->name) : null,
+                    'checkout_location_id' => $checkoutRequest->checkout_location_id,
+                    'checkout_reason' => e($checkoutRequest->checkout_reason),
+                    'approver_id' => $checkoutRequest->approver_id,
+                    'approver_name' => $checkoutRequest->approver ? e($checkoutRequest->approver->full_name) : null,
+                    'notes' => e($checkoutRequest->notes),
                     'expected_checkin' => Helper::getFormattedDateObject($checkoutRequest->itemRequested()->expected_checkin, 'datetime'),
+                    'end_date' => Helper::getFormattedDateObject($checkoutRequest->end_date, 'date'),
                     'request_date' => Helper::getFormattedDateObject($checkoutRequest->created_at, 'datetime'),
+                    'approval_status' => $checkoutRequest->approval_status->value,
+                    'status_label' => $statusLabel,
+                    'status_color' => $statusColor,
+                    'can_modify' => $canModifyOrCancel,
+                    'can_cancel' => $canModifyOrCancel,
                     // Self-cancel URL. POSTing to /account/request/{type}/{id}
                     // as the request owner toggles the open request into
                     // canceled state via isRequestedBy() -> cancelRequest()
@@ -164,9 +195,28 @@ class ProfileController extends Controller
         $sort = in_array($request->input('sort'), $allowed_columns, true) ? $request->input('sort') : 'asset_tag';
 
         $total = $assets->count();
-        $assets = $assets->orderBy('assets.' . $sort, $order)->skip($offset)->take($limit)->get();
+        $assets = $assets->orderBy('assets.'.$sort, $order)->skip($offset)->take($limit)->get();
 
-        return $transformer->transformAssets($assets, $total);
+        $payload = $transformer->transformAssets($assets, $total);
+
+        // 为「View Assigned Items」的归还按钮补充每行的归还申请状态：
+        // 无 pending 申请可发起归还，有 pending 申请可撤销。
+        $pendingReturnRequests = \App\Models\AssetReturnRequest::where('user_id', auth()->id())
+            ->pending()
+            ->whereIn('asset_id', $assets->pluck('id'))
+            ->get()
+            ->keyBy('asset_id');
+
+        foreach ($payload['rows'] as &$row) {
+            $pendingRequest = $pendingReturnRequests->get($row['id']);
+            $row['return_request'] = [
+                'can_create' => $pendingRequest === null,
+                'request_id' => $pendingRequest?->id,
+            ];
+        }
+        unset($row);
+
+        return $payload;
     }
 
     /**

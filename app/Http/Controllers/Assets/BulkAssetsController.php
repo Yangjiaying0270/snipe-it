@@ -460,7 +460,7 @@ class BulkAssetsController extends Controller
                     }
 
                 }
-                
+
                 if ($request->filled('rtd_location_id')) {
                     $this->update_array['rtd_location_id'] = $request->input('rtd_location_id');
                 }
@@ -956,6 +956,11 @@ class BulkAssetsController extends Controller
                     }
 
                     event(new CheckoutableCheckedIn($asset, $target, $admin, $request->input('note'), $checkin_at, $originalValues));
+
+                    // 归还申请闭环：兑现该资产挂起的归还申请并广播。
+                    foreach (\App\Models\AssetReturnRequest::fulfillForAsset($asset, $admin) as $returnRequest) {
+                        \App\Models\UserNotification::broadcastAssetReturned($returnRequest);
+                    }
                 } else {
                     $errors = array_merge_recursive($errors, $asset->getErrors()->toArray());
                 }

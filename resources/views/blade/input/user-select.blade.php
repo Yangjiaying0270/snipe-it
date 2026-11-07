@@ -23,6 +23,7 @@
     'wrapperId' => null,
     'id' => null,
     'style' => null,
+    'adminOnly' => false,
 ])
 
 @php

@@ -30,5 +30,4 @@ class SCIMUser extends User
     {
         return $this->belongsToMany(Company::class, 'company_user', 'user_id', 'company_id');
     }
-
 }

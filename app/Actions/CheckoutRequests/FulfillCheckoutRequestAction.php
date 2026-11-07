@@ -2,6 +2,7 @@
 
 namespace App\Actions\CheckoutRequests;
 
+use App\Enums\CheckoutRequestApprovalStatus;
 use App\Enums\CheckoutRequestState;
 use App\Exceptions\InvalidCheckoutRequestTransition;
 use App\Models\Actionlog;
@@ -98,6 +99,14 @@ class FulfillCheckoutRequestAction
             return;
         }
 
+        if ($checkoutActionlog && $checkoutActionlog->item_type === \App\Models\Asset::class) {
+            $asset = \App\Models\Asset::find($checkoutActionlog->item_id);
+            if ($asset && $request->checkout_location_id) {
+                $asset->location_id = $request->checkout_location_id; // 或者你的 now_location_id
+                $asset->saveQuietly();
+            }
+        }
+
         $request->fulfilled_quantity = (int) $request->fulfilled_quantity + $delta;
 
         if ($request->fulfilled_quantity >= $request->quantity) {
@@ -117,6 +126,7 @@ class FulfillCheckoutRequestAction
         ?int $fulfilledByUserId,
     ): void {
         $request->state = CheckoutRequestState::Fulfilled;
+        $request->approval_status = CheckoutRequestApprovalStatus::Fulfilled;
         $request->fulfilled_at = Carbon::now();
         $request->fulfilled_by = $fulfilledByUserId ?? auth()->id();
         $request->checkout_actionlog_id = $checkoutActionlog?->id;
@@ -129,5 +139,8 @@ class FulfillCheckoutRequestAction
             $request->fulfilled_quantity = $request->quantity;
         }
         $request->save();
+
+        // 站内通知：申请已全额兑现，告知申请人。
+        \App\Models\UserNotification::notifyFulfilled($request);
     }
 }

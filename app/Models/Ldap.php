@@ -673,7 +673,7 @@ class Ldap extends Model
             // Get results from page
             $results = ldap_get_entries($ldapconn, $search_results);
             if (! $results) {
-                throw new Exception(trans('admin/users/message.error.ldap_could_not_get_entries') . ldap_error($ldapconn));
+                throw new Exception(trans('admin/users/message.error.ldap_could_not_get_entries').ldap_error($ldapconn));
             }
 
             // Add results to result set

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Assets;
 
+use App\Enums\CheckoutRequestApprovalStatus;
 use App\Enums\FileStorage;
 use App\Events\CheckoutableCheckedIn;
 use App\Helpers\Helper;
@@ -18,6 +19,7 @@ use App\Models\Location;
 use App\Models\Setting;
 use App\Models\Statuslabel;
 use App\Models\User;
+use App\Models\UserNotification;
 use App\Observers\AssetObserver;
 use App\View\Label;
 use Carbon\Carbon;
@@ -155,7 +157,6 @@ class AssetsController extends Controller
             if ($model && $model->require_serial === 1 && empty($serials[$a])) {
                 $serial_errors["serials.$a"] = trans('admin/hardware/form.serial_required', ['number' => $a]);
             }
-
         }
 
         if (! empty($serial_errors)) {
@@ -219,7 +220,6 @@ class AssetsController extends Controller
                         Storage::disk('public')->copy('assets/'.$cloned_model_img->image, $new_image);
                         $asset->image = $new_image_name;
                     }
-
                 } else {
                     $asset = $request->handleImages($asset);
                 }
@@ -263,7 +263,6 @@ class AssetsController extends Controller
                             return redirect()->back()->withInput()->with('error', trans('admin/hardware/message.create.target_not_found.user'));
                         }
                         $location = $target->location_id;
-
                     } elseif ($assetId = request('assigned_asset')) {
                         $target = Asset::find($assetId);
 
@@ -271,7 +270,6 @@ class AssetsController extends Controller
                             return redirect()->back()->withInput()->with('error', trans('admin/hardware/message.create.target_not_found.asset'));
                         }
                         $location = $target->location_id;
-
                     } elseif ($locationId = request('assigned_location')) {
                         $target = Location::find($locationId);
 
@@ -286,7 +284,6 @@ class AssetsController extends Controller
                     }
 
                     $successes[] = "<a href='".route('hardware.show', $asset)."' style='color: white;'>".e($asset->asset_tag).'</a>';
-
                 } else {
                     $asset->throwValidationException(); // we have to do this for the reason listed above - can't use saveOrFail()
                     $failures[] = implode(',', $asset->getErrors()->all()); // TODO - this can probably go away soon
@@ -305,8 +302,10 @@ class AssetsController extends Controller
             session()->put(['redirect_option' => $request->input('redirect_option')]);
         }
 
-        session()->put(['checkout_to_type' => $request->input('checkout_to_type'),
-            'other_redirect' => 'model']);
+        session()->put([
+            'checkout_to_type' => $request->input('checkout_to_type'),
+            'other_redirect' => 'model',
+        ]);
 
         if ($successes) {
             if ($failures) {
@@ -1052,7 +1051,8 @@ class AssetsController extends Controller
             // short-circuits to true because AssetModel has no
             // company_id column. Fall back to the requesting user's
             // tenant visibility.
-            if ($checkoutRequest->requestable_type === AssetModel::class
+            if (
+                $checkoutRequest->requestable_type === AssetModel::class
                 && (! $checkoutRequest->user || ! Company::isCurrentUserHasAccess($checkoutRequest->user))
             ) {
                 continue;
@@ -1087,5 +1087,80 @@ class AssetsController extends Controller
 
         return redirect()->route('requests.index')
             ->with('success', trans('admin/hardware/message.requests.canceled'));
+    }
+
+    /**
+     * 批准申请：把审批状态置为"审核通过"，申请进入仓库管理员的待办队列。
+     * approver_id 保持不变（仍是被申请人选中的审批人），
+     * 这样申请被退回后修改时还能回到原审批人。
+     */
+    public function approveRequest(Request $request, int $id): RedirectResponse
+    {
+        $this->authorize('viewPendingRequests');
+
+        $checkoutRequest = CheckoutRequest::find($id);
+        if (! $checkoutRequest) {
+            return redirect()->route('requests.index')
+                ->with('error', trans('admin/hardware/message.requests.error'));
+        }
+
+        if ((int) $checkoutRequest->approver_id !== (int) auth()->id()) {
+            return redirect()->route('requests.index')
+                ->with('error', '该申请不在您的待办列表中');
+        }
+
+        $affected = CheckoutRequest::whereKey($id)
+            ->where('state', \App\Enums\CheckoutRequestState::Pending->value)
+            ->where('approval_status', CheckoutRequestApprovalStatus::Pending->value)
+            ->update(['approval_status' => CheckoutRequestApprovalStatus::Approved->value]);
+
+        if (! $affected) {
+            return redirect()->route('requests.index')
+                ->with('error', '该申请已被处理，请刷新后重试');
+        }
+
+        // 站内通知：告知仓库管理员有已批准申请待出库。
+        UserNotification::notifyApproved($checkoutRequest);
+        // 站内通知：告知申请人审批已通过。
+        UserNotification::notifyRequesterApproved($checkoutRequest);
+
+        return redirect()->route('requests.index')
+            ->with('success', '已批准，申请已转交仓库管理员');
+    }
+
+    /**
+     * 退回申请：把审批状态置为"已退回"，申请回到申请人处等待修改或撤销。
+     * approver_id 保持不变。
+     */
+    public function rejectRequest(Request $request, int $id): RedirectResponse
+    {
+        $this->authorize('viewPendingRequests');
+
+        $checkoutRequest = CheckoutRequest::find($id);
+        if (! $checkoutRequest) {
+            return redirect()->route('requests.index')
+                ->with('error', trans('admin/hardware/message.requests.error'));
+        }
+
+        if ((int) $checkoutRequest->approver_id !== (int) auth()->id()) {
+            return redirect()->route('requests.index')
+                ->with('error', '该申请不在您的待办列表中');
+        }
+
+        $affected = CheckoutRequest::whereKey($id)
+            ->where('state', \App\Enums\CheckoutRequestState::Pending->value)
+            ->where('approval_status', CheckoutRequestApprovalStatus::Pending->value)
+            ->update(['approval_status' => CheckoutRequestApprovalStatus::Rejected->value]);
+
+        if (! $affected) {
+            return redirect()->route('requests.index')
+                ->with('error', '该申请已被处理，请刷新后重试');
+        }
+
+        // 站内通知：告知申请人申请被退回，可在「我的申请」中修改或撤销。
+        UserNotification::notifyRejected($checkoutRequest);
+
+        return redirect()->route('requests.index')
+            ->with('success', '已退回申请人');
     }
 }

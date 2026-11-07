@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\CheckoutRequestApprovalStatus;
 use App\Enums\CheckoutRequestState;
 use App\Exceptions\InvalidCheckoutRequestTransition;
 use App\Models\Builders\CheckoutRequestQueryBuilder;
@@ -33,6 +34,10 @@ class CheckoutRequest extends Model
         'start_date',
         'end_date',
         'notes',
+        'checkout_location_id',
+        'approver_id',
+        'checkout_reason',
+        'approval_status',
         'state',
     ];
 
@@ -62,10 +67,12 @@ class CheckoutRequest extends Model
         'quantity' => 'integer',
         'fulfilled_quantity' => 'integer',
         'state' => CheckoutRequestState::class,
+        'approval_status' => CheckoutRequestApprovalStatus::class,
     ];
 
     protected $attributes = [
         'state' => 'pending',
+        'approval_status' => 'pending',
         'fulfilled_quantity' => 0,
     ];
 
@@ -79,6 +86,33 @@ class CheckoutRequest extends Model
     public function remainingQuantity(): int
     {
         return max(0, (int) $this->quantity - (int) $this->fulfilled_quantity);
+    }
+
+    /**
+     * Waiting for the approver picked by the requester.
+     */
+    public function isAwaitingApproval(): bool
+    {
+        return $this->state === CheckoutRequestState::Pending
+            && $this->approval_status === CheckoutRequestApprovalStatus::Pending;
+    }
+
+    /**
+     * Approved and waiting for the warehouse admin to check the item out.
+     */
+    public function isAwaitingCheckout(): bool
+    {
+        return $this->state === CheckoutRequestState::Pending
+            && $this->approval_status === CheckoutRequestApprovalStatus::Approved;
+    }
+
+    /**
+     * Returned to the requester, who may edit or cancel it.
+     */
+    public function isRejected(): bool
+    {
+        return $this->state === CheckoutRequestState::Pending
+            && $this->approval_status === CheckoutRequestApprovalStatus::Rejected;
     }
 
     /**
@@ -218,7 +252,8 @@ class CheckoutRequest extends Model
     protected static function booted(): void
     {
         static::saving(function (self $request): void {
-            if ($request->canceled_at !== null
+            if (
+                $request->canceled_at !== null
                 && $request->state === CheckoutRequestState::Pending
             ) {
                 $request->state = CheckoutRequestState::Canceled;
@@ -257,6 +292,28 @@ class CheckoutRequest extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
+    }
+
+    /**
+     * 申请时指定的使用地址（checkout_location_id → locations.id）。
+     * 与 location() 不同：location() 返回的是申请物品本身所在的位置，
+     * checkoutLocation() 返回的是申请人希望领用后使用的地址。
+     *
+     * @return BelongsTo<Location, $this>
+     */
+    public function checkoutLocation(): BelongsTo
+    {
+        return $this->belongsTo(Location::class, 'checkout_location_id', 'id');
+    }
+
+    /**
+     * 申请时指定的审批人（approver_id → users.id）。
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approver_id', 'id');
     }
 
     public function requestingUser()

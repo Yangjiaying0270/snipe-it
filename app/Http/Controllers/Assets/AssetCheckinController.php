@@ -222,6 +222,13 @@ class AssetCheckinController extends Controller
 
             event(new CheckoutableCheckedIn($asset, $target, auth()->user(), $request->input('note'), $checkin_at, $originalValues));
 
+            // 归还申请闭环：签入成功即兑现该资产所有挂起的归还申请
+            // （无论本次签入是否经由归还请求队列发起），并广播
+            // 「xxx 已归还 xxx」给所有用户。
+            foreach (\App\Models\AssetReturnRequest::fulfillForAsset($asset, auth()->user()) as $returnRequest) {
+                \App\Models\UserNotification::broadcastAssetReturned($returnRequest);
+            }
+
             return Helper::getRedirectOption($request, $asset->id, 'Assets')
                 ->with('success', trans('admin/hardware/message.checkin.success'));
         }

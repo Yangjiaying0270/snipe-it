@@ -4,13 +4,16 @@ namespace App\Listeners;
 
 use App\Actions\CheckoutRequests\FulfillCheckoutRequestAction;
 use App\Enums\ActionType;
+use App\Enums\CheckoutRequestApprovalStatus;
 use App\Enums\CheckoutRequestState;
 use App\Events\CheckoutableCheckedOut;
 use App\Models\Actionlog;
+use App\Models\Asset;
 use App\Models\CheckoutRequest;
 use App\Models\License;
 use App\Models\LicenseSeat;
 use App\Models\User;
+use App\Models\UserNotification;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -64,6 +67,15 @@ class FulfillCheckoutRequestListener
             ->where('state', CheckoutRequestState::Pending->value)
             ->get();
 
+        // 资产是 1:1 的实体：一旦出库给某个人，同一资产上其他用户的待审批
+        // 申请就再也没有兑现的可能，立即置为「已失效」（state=canceled +
+        // approval_status=invalidated）。放在 openRequests 早退之前，
+        // 这样即便管理员直接出库（领用人本来就没有申请）也照样清理排队者。
+        // 仅限 Asset：配件/耗材/组件/许可证按数量分配，多人可各得一部分。
+        if ($requestableType === Asset::class) {
+            $this->invalidateCompetingRequests($requestableId, $event->checkedOutTo->id);
+        }
+
         if ($openRequests->isEmpty()) {
             return;
         }
@@ -98,6 +110,31 @@ class FulfillCheckoutRequestListener
                 // the row will surface on the admin queue for manual
                 // cleanup rather than silently corrupting state.
                 Log::warning('Failed to auto-fulfill CheckoutRequest #'.$request->id.': '.$e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * 把同一资产上其他用户的待处理申请标记为已失效。
+     * 保留 winnerUserId 自己的申请（那条由 FulfillCheckoutRequestAction
+     * 正常结转），其余 pending 行统一 state=canceled + approval_status=invalidated，
+     * 走 cancelAndSync() 以同步清理日历预约事件。
+     */
+    private function invalidateCompetingRequests(int $assetId, int $winnerUserId): void
+    {
+        $competing = CheckoutRequest::where('requestable_type', Asset::class)
+            ->where('requestable_id', $assetId)
+            ->where('user_id', '!=', $winnerUserId)
+            ->where('state', CheckoutRequestState::Pending->value)
+            ->get();
+
+        foreach ($competing as $request) {
+            try {
+                $request->approval_status = CheckoutRequestApprovalStatus::Invalidated;
+                $request->cancelAndSync();
+                UserNotification::notifyInvalidated($request);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to invalidate CheckoutRequest #'.$request->id.': '.$e->getMessage());
             }
         }
     }

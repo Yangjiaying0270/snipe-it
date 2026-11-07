@@ -17,6 +17,7 @@ enum ActionType: string
     case Consumed = 'consumed';
     case Requested = 'requested';
     case RequestCanceled = 'request canceled';
+    case RequestUpdated = 'request updated';
     // Note: no RequestFulfilled - fulfillment piggybacks on the
     // existing Checkout actionlog via CheckoutRequest::checkout_actionlog_id,
     // so writing a separate row here would double the item's history.

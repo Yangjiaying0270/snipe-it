@@ -2,6 +2,8 @@
 
 namespace App\Http\Transformers;
 
+use App\Enums\CheckoutRequestApprovalStatus;
+use App\Enums\CheckoutRequestState;
 use App\Helpers\Helper;
 use App\Helpers\IconHelper;
 use App\Models\Accessory;
@@ -63,6 +65,13 @@ class CheckoutRequestsTransformer
                 'label' => $request->state->label(),
                 'color' => $request->state->color(),
             ],
+            // 审批流程阶段，与 state 独立：state 表示申请是否还开着，
+            // approval_status 表示走到哪一步（未审核/审核通过/已退回/已满足/已失效）。
+            'approval_status' => [
+                'value' => $request->approval_status->value,
+                'label' => $request->approval_status->label(),
+                'color' => $request->approval_status->color(),
+            ],
             'fulfilled_at' => $request->fulfilled_at
                 ? Helper::getFormattedDateObject($request->fulfilled_at, 'datetime')
                 : null,
@@ -82,6 +91,14 @@ class CheckoutRequestsTransformer
                 ? Helper::getFormattedDateObject($request->end_date, 'date')
                 : null,
             'notes' => $request->notes ? e($request->notes) : null,
+            // 申请人指定的使用地址（checkout_location_id → locations.name）。
+            // 与 requestable.location（物品本身所在位置）不同，这是领用后的使用地址。
+            'checkout_location' => $request->checkoutLocation ? [
+                'id' => (int) $request->checkoutLocation->id,
+                'name' => e($request->checkoutLocation->name),
+            ] : null,
+            // 申请理由（申请人在申请表单中填写的 checkout_reason）。
+            'checkout_reason' => $request->checkout_reason ? e($request->checkout_reason) : null,
             'user' => $requester ? [
                 'id' => (int) $requester->id,
                 'name' => e($requester->display_name),
@@ -92,7 +109,7 @@ class CheckoutRequestsTransformer
             ] : null,
             'requestable' => $item ? self::transformRequestable($item, $request) : null,
             'pending_requesters' => self::pendingRequestersFor($request, $requesterMap),
-            'available_actions' => self::availableActions($item),
+            'available_actions' => self::availableActions($item, $request),
         ];
     }
 
@@ -360,7 +377,7 @@ class CheckoutRequestsTransformer
     /**
      * @return array<string, mixed>
      */
-    private static function availableActions($item): array
+    private static function availableActions($item, CheckoutRequest $request): array
     {
         $cancelable = $item !== null;
 
@@ -409,6 +426,23 @@ class CheckoutRequestsTransformer
             $canCheckout = $item->availableAssets()->exists();
         }
 
+        // 审批流程：
+        // - "批准/退回"只出现在"未审核"且当前用户就是该申请审批人的行上；
+        // - "签出"只对"审核通过"的行开放（超管保留原逻辑）。
+        // 这里只输出 UI 标记，实际权限与状态校验在后端控制器。
+        $actor = auth()->user();
+        $isSuperUser = $actor ? $actor->isSuperUser() : false;
+        $isAssignedApprover = $actor && (int) $request->approver_id === (int) $actor->id;
+
+        $canApprove = $isAssignedApprover
+            && $request->state === CheckoutRequestState::Pending
+            && $request->approval_status === CheckoutRequestApprovalStatus::Pending;
+
+        $isAwaitingWarehouse = $request->state === CheckoutRequestState::Pending
+            && $request->approval_status === CheckoutRequestApprovalStatus::Approved;
+
+        $canCheckout = $canCheckout && ($isSuperUser || $isAwaitingWarehouse);
+
         return [
             // Cancel-by-admin is available whenever the item still
             // exists on the row. The action itself re-authorizes on
@@ -417,6 +451,9 @@ class CheckoutRequestsTransformer
             'replenish' => $replenishable,
             'checkout' => $canCheckout,
             'checkin' => $canCheckin,
+            // 只有该申请的审批人、且申请尚未审核时才显示批准/退回。
+            'approve' => $canApprove,
+            'reject' => $canApprove,
             // Bulk-cancel widget reads this. Row gets checkbox-enabled
             // iff at least one bulk_selectable entry is true; keeping
             // the shape as a sub-array so future bulk actions (approve,

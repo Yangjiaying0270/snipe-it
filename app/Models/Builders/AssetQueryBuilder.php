@@ -181,7 +181,16 @@ class AssetQueryBuilder extends Builder
     {
         $table = $this->getModel()->getTable();
 
-        return Company::scopeCompanyables($this->where($table.'.requestable', '=', 1))
+        // 已出库（已分配给任何人/位置/其他资产）的资产不可再申请。
+        // assigned_to 为 NULL 或 0 才视为在库可申请，镜像 deployed() 的
+        // assigned_to > 0 语义。
+        return Company::scopeCompanyables(
+            $this->where($table.'.requestable', '=', 1)
+                ->where(function ($query) use ($table) {
+                    $query->whereNull($table.'.assigned_to')
+                        ->orWhere($table.'.assigned_to', '<', 1);
+                })
+        )
             ->whereHas('status', function ($query) {
                 $query->where(function ($query) {
                     $query->where('deployable', '=', 1)

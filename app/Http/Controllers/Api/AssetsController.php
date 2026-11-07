@@ -1588,6 +1588,11 @@ class AssetsController extends Controller
 
                 event(new CheckoutableCheckedIn($locked, $target, auth()->user(), $request->input('note'), $checkin_at, $originalValues));
 
+                // 归还申请闭环：同 Web 签入一致，兑现该资产挂起的归还申请并广播。
+                foreach (\App\Models\AssetReturnRequest::fulfillForAsset($locked, auth()->user()) as $returnRequest) {
+                    \App\Models\UserNotification::broadcastAssetReturned($returnRequest);
+                }
+
                 return ['status' => 'success', 'asset' => $locked];
             }
 

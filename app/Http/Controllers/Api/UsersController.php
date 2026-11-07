@@ -431,11 +431,16 @@ class UsersController extends Controller
         // See: https://github.com/snipe/snipe-it/issues/ (v8.6.3 regression report)
         if ((Setting::getSettings()->full_multiple_companies_support == '1')
             && $request->filled('companyId')
-            && ! auth()->user()->isSuperUser()) {
+            && ! auth()->user()->isSuperUser()
+        ) {
             $companyIds = array_values(array_filter(array_map('intval', explode(',', $request->input('companyId')))));
             if (! empty($companyIds)) {
                 $users = Company::scopeUsersByCompanyIds($users, $companyIds);
             }
+        }
+
+        if ($request->boolean('admin_only')) {
+            $users->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(permissions, '$.admin')) = '1'");
         }
 
         if ($request->filled('excludeId')) {
@@ -579,7 +584,6 @@ class UsersController extends Controller
                 } catch (\Exception $e) {
                     Log::warning('Could not send welcome notification for user: '.$e->getMessage());
                 }
-
             }
 
             if (($request->has('groups')) && (auth()->user()->isSuperUser())) {
@@ -614,7 +618,6 @@ class UsersController extends Controller
         }
 
         return response()->json(Helper::formatStandardApiResponse('error', null, trans('admin/users/message.user_not_found', compact('id'))));
-
     }
 
     /**
@@ -726,7 +729,6 @@ class UsersController extends Controller
                     targetUser: $user,
                 ));
             }
-
         }
 
         if ($user->id == $request->input('manager_id')) {
@@ -817,11 +819,9 @@ class UsersController extends Controller
             }
 
             return response()->json(Helper::formatStandardApiResponse('error', null, trans('admin/users/message.cannot_delete')));
-
         }
 
         return response()->json(Helper::formatStandardApiResponse('error', null, trans('admin/users/message.user_not_found')));
-
     }
 
     /**
@@ -868,7 +868,6 @@ class UsersController extends Controller
         }
 
         return response()->json(Helper::formatStandardApiResponse('error', null, trans('admin/users/message.user_not_found', compact('id'))));
-
     }
 
     /**
@@ -895,7 +894,6 @@ class UsersController extends Controller
         }
 
         return response()->json(Helper::formatStandardApiResponse('error', null, trans('admin/users/message.user_not_found', compact('id'))));
-
     }
 
     /**
@@ -1037,7 +1035,6 @@ class UsersController extends Controller
         }
 
         return response()->json(Helper::formatStandardApiResponse('error', null, trans('admin/users/message.user_not_found', compact('id'))));
-
     }
 
     /**
@@ -1104,11 +1101,9 @@ class UsersController extends Controller
                 // UserObserver::restoring, no manual write here.
                 return response()->json(Helper::formatStandardApiResponse('success', null, trans('admin/users/message.success.restored')), 200);
             }
-
         }
 
         return response()->json(Helper::formatStandardApiResponse('error', null, trans('admin/users/message.user_not_found')), 200);
-
     }
 
     /**
@@ -1147,7 +1142,6 @@ class UsersController extends Controller
         }
 
         return response()->json(Helper::formatStandardApiResponse('success', null, $ldap_results['summary']), 200);
-
     }
 
     public function history(Request $request, User $user): JsonResponse|array

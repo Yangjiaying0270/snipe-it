@@ -265,6 +265,8 @@
                                 @endif
                             @endcan
 
+                            {{-- 站内提醒（申请审批 / 出库 / 退回 / 失效）。 --}}
+                            <x-user-notifications-bell />
 
 
                             <!-- User Account: style can be found in dropdown.less -->
@@ -317,6 +319,13 @@
                                         </li>
 
                                         @endcan
+
+                                        <li {!! (request()->is('account/notifications') ? ' class="active" aria-current="page"' : '') !!}>
+                                            <a href="{{ route('account.notifications.index') }}">
+                                                <x-icon type="bell" class="fa-fw" />
+                                                我的消息
+                                            </a>
+                                        </li>
                                         <li {!! (request()->is('account/profile') ? ' class="active" aria-current="page"' : '') !!}>
                                             <a href="{{ route('profile') }}">
                                                 <x-icon type="user" class="fa-fw" />
@@ -843,7 +852,7 @@
                                 </ul>
                             </li>
                         @endcan
-                            @can('canCheckoutAtLeastOneItemType')
+                            @can('viewPendingRequests')
                                 <li{!! (request()->is('requests.index') ? ' class="active" aria-current="page"' : '') !!}>
                                     <a href="{{ route('requests.index') }}">
                                         <x-icon type="pending-requests" class="fa-fw"/>
@@ -857,7 +866,14 @@
                                     </a>
                                 </li>
                             @endcan
-
+                            @can('viewReturnRequests')
+                                <li{!! (request()->is('return-requests*') ? ' class="active" aria-current="page"' : '') !!}>
+                                    <a href="{{ route('return-requests.index') }}">
+                                        <x-icon type="checkin" class="fa-fw"/>
+                                        <span>归还请求</span>
+                                    </a>
+                                </li>
+                            @endcan
                         @can('viewRequestable', \App\Models\Asset::class)
                             <li{!! (request()->is('account/requestable') ? ' class="active" aria-current="page"' : '') !!}>
                                 <a href="{{ route('account.requestable') }}">
@@ -970,6 +986,9 @@
 
                         <x-notifications />
                     </div>
+
+                    {{-- 登录后的站内提醒弹窗，关闭时全部标记已读。 --}}
+                    <x-user-notifications-modal />
 
 
                     <!-- Content -->

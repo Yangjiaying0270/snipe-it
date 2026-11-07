@@ -367,6 +367,88 @@ $(function () {
         $modal.modal('show');
     });
 
+    // 归还申请弹窗（「View Assigned Items」归还列）。按钮携带
+    // data-return-url + data-asset-name，提交走
+    // Account\AssetReturnRequestController@store。
+    $el.on('click', '.request-return', function () {
+        var $btn = $(this);
+        var $modal = $('#returnRequestModal');
+        var $form = $('#returnRequestForm');
+
+        $form.attr('action', $btn.data('return-url'));
+        $modal.find('.return-request-asset-name').text($btn.data('asset-name') || '');
+        $modal.find('#returnRequestNote').val('');
+
+        $modal.modal('show');
+    });
+
+    // Modify an existing request from the My Requests table. The
+    // trigger button carries every editable field as a data-* attr
+    // (see userRequestActionsFormatter) so we can prefill the shared
+    // request-item modal without a round-trip. The hidden request_id
+    // field tells the controller to UPDATE that row (and reset its
+    // approval_status to pending) instead of creating a new one.
+    $el.on('click', '.modify-request', function () {
+        var $btn = $(this);
+        var $modal = $('#requestItemModal');
+        var $form = $('#requestItemForm');
+
+        $form.attr('action', $btn.data('request-url'));
+        $modal.find('.request-item-name').text($btn.data('item-name') || '');
+        $modal.find('#requestItemRequestId').val($btn.data('request-id') || '');
+
+        // Qty row visibility follows the same asset/license rule as
+        // the create flow. Assets are 1:1, licenses one-seat-per-request.
+        var itemType = ($btn.data('item-type') || '').toString().toLowerCase();
+        var hidesQty = itemType === 'asset' || itemType === 'license';
+        var $qtyInput = $modal.find('#requestItemQuantity');
+        $modal.find('#requestItemQuantityRow').toggle(!hidesQty);
+        $qtyInput.prop('required', !hidesQty);
+        $qtyInput.val(hidesQty ? 1 : ($btn.data('qty') || 1));
+
+        $modal.find('#requestItemEndDate').val($btn.data('end-date') || '');
+        $modal.find('#requestItemCheckoutReason').val($btn.data('checkout-reason') || '');
+        $modal.find('#requestItemNotes').val($btn.data('notes') || '');
+
+        // Prefill the two AJAX select2s (location + approver). The
+        // current value isn't in the DOM (select2 only loads options
+        // on search), so append an <option> with the id + name we
+        // carried on the button, set the value, and fire change so
+        // select2 re-renders the selection.
+        var $locationSelect = $modal.find('#location_id_location_select');
+        var locationId = $btn.data('location-id');
+        if (locationId) {
+            if (!$locationSelect.find('option[value="' + locationId + '"]').length) {
+                $locationSelect.append($('<option>', {
+                    value: locationId,
+                    text: $btn.data('location-name') || locationId,
+                    selected: 'selected'
+                }));
+            }
+            $locationSelect.val(locationId).trigger('change');
+        }
+
+        var $approverSelect = $modal.find('#approver_id_select');
+        var approverId = $btn.data('approver-id');
+        if (approverId) {
+            if (!$approverSelect.find('option[value="' + approverId + '"]').length) {
+                $approverSelect.append($('<option>', {
+                    value: approverId,
+                    text: $btn.data('approver-name') || approverId,
+                    selected: 'selected'
+                }));
+            }
+            $approverSelect.val(approverId).trigger('change');
+        }
+
+        // No active-tab restore for modify: the My Requests page has
+        // no tabs, so leave active_tab blank and let the controller
+        // fall back to redirect()->back().
+        $modal.find('#requestItemActiveTab').val('');
+
+        $modal.modal('show');
+    });
+
     // confirm delete modal
     $el.on('click', '.delete-asset, .delete-custom-label', function (evnt) {
         var $context = $(this);
@@ -477,6 +559,7 @@ $(function () {
                         // the parent-company picker so users can't choose options
                         // that would fail the parent_must_be_top_level validator.
                         onlyTopLevel: link.data("only-top-level"),
+                        admin_only: link.data("adminOnly") ? 1 : 0,
                     };
                     return data;
                 },

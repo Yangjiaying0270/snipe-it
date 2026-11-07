@@ -16,6 +16,11 @@
 
      Renders nothing when $request is null --}}
 @if (! empty($request))
+    {{-- 表单 action 是 url()->current()（不含查询串），必须显式带上
+         request_id，出库成功后监听器才能结转这条申请；
+         资产出库时还会据此把资产位置覆盖为申请里的"使用地址"。 --}}
+    <input type="hidden" name="request_id" value="{{ (int) $request->id }}">
+
     <x-box header="{{ trans('admin/hardware/general.requested') }}">
         <x-page-data>
             <x-data-row :label="trans('admin/hardware/table.requesting_user')">

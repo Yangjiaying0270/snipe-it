@@ -1594,6 +1594,23 @@ class Asset extends Depreciable implements Importable
     }
 
     /**
+     * 该资产的归还申请记录。
+     */
+    public function returnRequests()
+    {
+        return $this->hasMany(AssetReturnRequest::class, 'asset_id', 'id');
+    }
+
+    /**
+     * 该资产当前待签入的归还申请（最多一条，创建时校验）。
+     */
+    public function pendingReturnRequest()
+    {
+        return $this->hasOne(AssetReturnRequest::class, 'asset_id', 'id')
+            ->where('state', \App\Enums\AssetReturnRequestState::Pending->value);
+    }
+
+    /**
      * Get the asset's user requests
      *
      * @author [A. Gianotto] [<snipe@snipe.net>]

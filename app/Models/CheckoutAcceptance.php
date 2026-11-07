@@ -66,7 +66,7 @@ class CheckoutAcceptance extends Model
      */
     public function isAccessibleToCurrentUser(): bool
     {
-        if (!Company::isFullMultipleCompanySupportEnabled()) {
+        if (! Company::isFullMultipleCompanySupportEnabled()) {
             return true;
         }
 

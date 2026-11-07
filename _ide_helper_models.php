@@ -341,30 +341,16 @@ namespace App\Models{
  * @property int|null $depreciate
  * @property int|null $supplier_id
  * @property int|null $rtd_location_id
+ * @property string|null $_snipeit_mac_address_1
  * @property string|null $accepted
  * @property \Illuminate\Support\Carbon|null $last_checkout
  * @property \Illuminate\Support\Carbon|null $expected_checkin
  * @property string|null $assigned_type
  * @property int $checkin_counter
- * @property int $requests_counter
  * @property int $checkout_counter
+ * @property int $requests_counter
  * @property int|null $byod
- * @property string|null $_snipeit_imei_1
- * @property string|null $_snipeit_phone_number_2
- * @property string|null $_snipeit_ram_3
- * @property string|null $_snipeit_cpu_4
- * @property string|null $_snipeit_mac_address_5
- * @property string|null $_snipeit_test_encrypted_6
- * @property string|null $_snipeit_test_checkbox_7
- * @property string|null $_snipeit_test_radio_8
- * @property string|null $_snipeit_notes_9
- * @property string|null $_snipeit_sample_date_10
- * @property string|null $_snipeit_sample_datetime_11
- * @property string|null $_snipeit__12
- * @property string|null $_snipeit_dscsdaffds_13
- * @property string|null $_snipeit_last_seen_network_heartbeat_14
- * @property string|null $_snipeit_disk_encryption_15
- * @property string|null $_snipeit_some_number_16
+ * @property string|null $_snipeit__3
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Accessory> $accessories
  * @property-read int|null $accessories_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Actionlog> $actionlog
@@ -421,9 +407,12 @@ namespace App\Models{
  * @property-read int|null $order_items_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\Order> $orders
  * @property-read int|null $orders_count
+ * @property-read \App\Models\AssetReturnRequest|null $pendingReturnRequest
  * @property-read mixed $purchase_date_formatted
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CheckoutRequest> $requests
  * @property-read int|null $requests_count
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\AssetReturnRequest> $returnRequests
+ * @property-read int|null $return_requests_count
  * @property-write mixed $category_id
  * @property-write mixed $department_id
  * @property-write mixed $depreciation_id
@@ -527,22 +516,8 @@ namespace App\Models{
  * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereRequestsCounter($value)
  * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereRtdLocationId($value)
  * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSerial($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeit12($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitCpu4($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitDiskEncryption15($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitDscsdaffds13($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitImei1($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitLastSeenNetworkHeartbeat14($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitMacAddress5($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitNotes9($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitPhoneNumber2($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitRam3($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitSampleDate10($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitSampleDatetime11($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitSomeNumber16($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitTestCheckbox7($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitTestEncrypted6($value)
- * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitTestRadio8($value)
+ * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeit3($value)
+ * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSnipeitMacAddress1($value)
  * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereStatusId($value)
  * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereSupplierId($value)
  * @method static \App\Models\Builders\AssetQueryBuilder<static>|Asset whereUpdatedAt($value)
@@ -613,9 +588,7 @@ namespace App\Models{
  * @property string|null $mfg_marketing_name
  * @property \Illuminate\Support\Carbon|null $mfg_release_date
  * @property \Illuminate\Support\Carbon|null $mfg_discontinued_date
- * @property string|null $tag_slug
  * @property string|null $model_number
- * @property string|null $hardware_identifier
  * @property int|null $min_amt
  * @property int|null $manufacturer_id
  * @property int|null $category_id
@@ -701,7 +674,6 @@ namespace App\Models{
  * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereDepreciationId($value)
  * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereEol($value)
  * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereFieldsetId($value)
- * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereHardwareIdentifier($value)
  * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereId($value)
  * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereImage($value)
  * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereManufacturerId($value)
@@ -714,7 +686,6 @@ namespace App\Models{
  * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereNotes($value)
  * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereRequestable($value)
  * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereRequireSerial($value)
- * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereTagSlug($value)
  * @method static \App\Models\Builders\AssetModelQueryBuilder<static>|AssetModel whereUpdatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetModel withTrashed(bool $withTrashed = true)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetModel withoutTrashed()
@@ -722,6 +693,54 @@ namespace App\Models{
  */
 	#[\AllowDynamicProperties]
 	class IdeHelperAssetModel {}
+}
+
+namespace App\Models{
+/**
+ * 资产归还申请。
+ *
+ * 用户在「View Assigned Items」对自己的资产点击归还时创建（pending），
+ * 仓库管理员签入该资产后关闭（fulfilled），申请人可撤销（canceled）。
+ *
+ * @property AssetReturnRequestState $state
+ * @property int $id
+ * @property int $asset_id
+ * @property int $user_id
+ * @property string|null $note
+ * @property int|null $checkin_location_id
+ * @property int|null $handled_by
+ * @property \Illuminate\Support\Carbon|null $fulfilled_at
+ * @property \Illuminate\Support\Carbon|null $canceled_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property-read \App\Models\Asset|null $asset
+ * @property-read \App\Models\Location|null $checkinLocation
+ * @property-read \App\Models\User|null $handledBy
+ * @property-read \App\Models\User|null $user
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest onlyTrashed()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest pending()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereAssetId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereCanceledAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereCheckinLocationId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereDeletedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereFulfilledAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereHandledBy($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereNote($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereState($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest whereUserId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest withTrashed(bool $withTrashed = true)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|AssetReturnRequest withoutTrashed()
+ * @mixin \Eloquent
+ */
+	#[\AllowDynamicProperties]
+	class IdeHelperAssetReturnRequest {}
 }
 
 namespace App\Models{
@@ -781,7 +800,6 @@ namespace App\Models{
  * @version v1.0
  * @property int $id
  * @property string $name
- * @property string|null $tag_slug
  * @property string|null $tag_color
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -857,7 +875,6 @@ namespace App\Models{
  * @method static \App\Models\Builders\CategoryQueryBuilder<static>|Category whereNotes($value)
  * @method static \App\Models\Builders\CategoryQueryBuilder<static>|Category whereRequireAcceptance($value)
  * @method static \App\Models\Builders\CategoryQueryBuilder<static>|Category whereTagColor($value)
- * @method static \App\Models\Builders\CategoryQueryBuilder<static>|Category whereTagSlug($value)
  * @method static \App\Models\Builders\CategoryQueryBuilder<static>|Category whereUpdatedAt($value)
  * @method static \App\Models\Builders\CategoryQueryBuilder<static>|Category whereUseDefaultEula($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Category withTrashed(bool $withTrashed = true)
@@ -937,6 +954,10 @@ namespace App\Models{
  * @property \Illuminate\Support\Carbon|null $start_date
  * @property \Illuminate\Support\Carbon|null $end_date
  * @property string|null $notes
+ * @property int|null $checkout_location_id
+ * @property int|null $approver_id 审批人ID
+ * @property string|null $checkout_reason 申请理由
+ * @property \App\Enums\CheckoutRequestApprovalStatus $approval_status
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property \Illuminate\Support\Carbon|null $canceled_at
@@ -944,9 +965,11 @@ namespace App\Models{
  * @property int|null $fulfilled_by
  * @property int|null $checkout_actionlog_id
  * @property \Illuminate\Support\Carbon|null $deleted_at
+ * @property-read \App\Models\User|null $approver
  * @property-read \Illuminate\Database\Eloquent\Collection<int, \App\Models\CalendarEvent> $calendarEvents
  * @property-read int|null $calendar_events_count
  * @property-read \App\Models\Actionlog|null $checkoutActionlog
+ * @property-read \App\Models\Location|null $checkoutLocation
  * @property-read \App\Models\User|null $fulfilledBy
  * @property-read mixed|null $calendar_end
  * @property-read mixed|null $calendar_start
@@ -954,6 +977,8 @@ namespace App\Models{
  * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $requestable
  * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $requestedItem
  * @property-read \App\Models\User|null $user
+ * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest awaitingApproval()
+ * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest awaitingWarehouse()
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest canceled()
  * @method static \Database\Factories\CheckoutRequestFactory factory($count = null, $state = [])
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest fulfilled()
@@ -965,8 +990,12 @@ namespace App\Models{
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest pending()
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest query()
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest textSearch($search)
+ * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest whereApprovalStatus($value)
+ * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest whereApproverId($value)
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest whereCanceledAt($value)
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest whereCheckoutActionlogId($value)
+ * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest whereCheckoutLocationId($value)
+ * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest whereCheckoutReason($value)
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest whereCreatedAt($value)
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest whereDeletedAt($value)
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest whereEndDate($value)
@@ -997,7 +1026,6 @@ namespace App\Models{
  * @version v1.8
  * @property int $id
  * @property string $name
- * @property string|null $tag_slug
  * @property int|null $parent_id
  * @property string|null $tag_color
  * @property string|null $fax
@@ -1083,7 +1111,6 @@ namespace App\Models{
  * @method static \App\Models\Builders\CompanyQueryBuilder<static>|Company whereParentId($value)
  * @method static \App\Models\Builders\CompanyQueryBuilder<static>|Company wherePhone($value)
  * @method static \App\Models\Builders\CompanyQueryBuilder<static>|Company whereTagColor($value)
- * @method static \App\Models\Builders\CompanyQueryBuilder<static>|Company whereTagSlug($value)
  * @method static \App\Models\Builders\CompanyQueryBuilder<static>|Company whereUpdatedAt($value)
  * @method static \App\Models\Builders\CompanyQueryBuilder<static>|Company whereWebhookBotname($value)
  * @method static \App\Models\Builders\CompanyQueryBuilder<static>|Company whereWebhookChannel($value)
@@ -2388,7 +2415,6 @@ namespace App\Models{
 /**
  * @property int $id
  * @property string $name
- * @property string|null $tag_slug
  * @property string|null $tag_color
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -2458,7 +2484,6 @@ namespace App\Models{
  * @method static \App\Models\Builders\ManufacturerQueryBuilder<static>|Manufacturer whereSupportPhone($value)
  * @method static \App\Models\Builders\ManufacturerQueryBuilder<static>|Manufacturer whereSupportUrl($value)
  * @method static \App\Models\Builders\ManufacturerQueryBuilder<static>|Manufacturer whereTagColor($value)
- * @method static \App\Models\Builders\ManufacturerQueryBuilder<static>|Manufacturer whereTagSlug($value)
  * @method static \App\Models\Builders\ManufacturerQueryBuilder<static>|Manufacturer whereUpdatedAt($value)
  * @method static \App\Models\Builders\ManufacturerQueryBuilder<static>|Manufacturer whereUrl($value)
  * @method static \App\Models\Builders\ManufacturerQueryBuilder<static>|Manufacturer whereWarrantyLookupUrl($value)
@@ -3033,7 +3058,6 @@ namespace App\Models{
  * @property int|null $display_eol
  * @property int $auto_increment_assets
  * @property string|null $auto_increment_prefix
- * @property int $scope_counters_by_company
  * @property int $load_remote
  * @property string|null $logo
  * @property string|null $header_color
@@ -3168,7 +3192,6 @@ namespace App\Models{
  * @property string|null $saml_sp_x509certNew
  * @property string|null $digit_separator
  * @property string|null $ldap_client_tls_cert
- * @property int $ldap_use_sasl_external_bind
  * @property string|null $ldap_client_tls_key
  * @property string|null $dash_chart_type
  * @property int $label2_enable
@@ -3190,8 +3213,6 @@ namespace App\Models{
  * @property int|null $due_checkin_days
  * @property int $ldap_invert_active_flag
  * @property bool $manager_view_enabled Allow managers to view assets assigned to their subordinates
- * @property string|null $fleet_url
- * @property string|null $fleet_token
  * @property-read string $label2_template_display
  * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
  * @property-read int|null $notifications_count
@@ -3238,8 +3259,6 @@ namespace App\Models{
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereEmailFormat($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereEmailLogo($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereFavicon($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereFleetToken($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereFleetUrl($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereFooterText($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereFullMultipleCompaniesSupport($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereGoogleClientId($value)
@@ -3307,7 +3326,6 @@ namespace App\Models{
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereLdapState($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereLdapTls($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereLdapUname($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereLdapUseSaslExternalBind($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereLdapUsernameField($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereLdapVersion($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereLdapZip($value)
@@ -3347,7 +3365,6 @@ namespace App\Models{
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereSamlSpPrivatekey($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereSamlSpX509cert($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereSamlSpX509certNew($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereScopeCountersByCompany($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereScopeLocationsFmcs($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereShortcutsEnabled($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Setting whereShowAlertsInMenu($value)
@@ -3851,5 +3868,43 @@ namespace App\Models{
  */
 	#[\AllowDynamicProperties]
 	class IdeHelperUser {}
+}
+
+namespace App\Models{
+/**
+ * 站内通知（登录提醒）。
+ *
+ * 五类工作流事件各写一条：提交→审批人、批准→仓库、退回→申请人、
+ * 出库→中签者、失效→落选者。read_at 非 NULL 即已读。
+ *
+ * @property int $id
+ * @property int $user_id
+ * @property string $type
+ * @property string $title
+ * @property string|null $body
+ * @property int|null $checkout_request_id
+ * @property Carbon|null $read_at
+ * @property int|null $asset_return_request_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read \App\Models\CheckoutRequest|null $checkoutRequest
+ * @property-read \App\Models\User|null $user
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification query()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification whereAssetReturnRequestId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification whereBody($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification whereCheckoutRequestId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification whereReadAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification whereTitle($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification whereType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|UserNotification whereUserId($value)
+ * @mixin \Eloquent
+ */
+	#[\AllowDynamicProperties]
+	class IdeHelperUserNotification {}
 }
 

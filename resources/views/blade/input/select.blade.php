@@ -6,12 +6,14 @@
     'includeEmpty' => false,
     'forLivewire' => false,
     'required' => false,
+    'adminOnly' => false,
 ])
 
 <select
     {{ $attributes->class(['select2', 'livewire-select2' => $forLivewire]) }}
     @required($required)
     @if($forLivewire) data-livewire-component="{{ $this->getId() }}" @endif
+    @if ($adminOnly) data-admin-only="1" @endif
 >
     @if($includeEmpty)
         <option value=""></option>

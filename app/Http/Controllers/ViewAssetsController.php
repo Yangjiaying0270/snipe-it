@@ -5,16 +5,20 @@ namespace App\Http\Controllers;
 use App\Actions\CheckoutRequests\CancelCheckoutRequestAction;
 use App\Actions\CheckoutRequests\CreateCheckoutRequestAction;
 use App\Enums\ActionType;
+use App\Enums\CheckoutRequestApprovalStatus;
+use App\Enums\CheckoutRequestState;
 use App\Exceptions\ItemNotRequestable;
 use App\Models\Accessory;
 use App\Models\Actionlog;
 use App\Models\Asset;
 use App\Models\AssetModel;
+use App\Models\CheckoutRequest;
 use App\Models\Component;
 use App\Models\Consumable;
 use App\Models\License;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\UserNotification;
 use App\Notifications\RequestAssetCancelation;
 use Exception;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -205,6 +209,12 @@ class ViewAssetsController extends Controller
             return redirect()->back()->with('error', trans('general.insufficient_permissions'));
         }
 
+        // 修改模式：表单携带 request_id，走更新分支（重置审批状态为 pending）。
+        // 必须在 isRequestedBy 判定之前拦截，否则已存在 pending 申请会被误判为取消。
+        if ($request->filled('request_id')) {
+            return $this->handleModifyRequest($request, $item, $fullItemType, $itemType);
+        }
+
         $item_request = $item->isRequestedBy($user);
 
         if ($item_request || ($is_admin && $cancel_by_admin)) {
@@ -290,6 +300,13 @@ class ViewAssetsController extends Controller
 
     private function handleCancelRequest(Request $request, $item, string $fullItemType, string $itemType, $item_request, $requestingUser): RedirectResponse
     {
+        // 已批准的申请不可取消：仓库已在备货/出库，取消会造成状态不一致。
+        // 已完成/已撤销/已失效 的行 state 不再是 pending，isRequestedBy 本就不会命中；
+        // 这里专门拦截 approval_status=approved 的 pending 行。
+        if ($item_request && $item_request->isAwaitingCheckout()) {
+            return redirect()->back()->with('error', '已批准的申请无法取消，请联系仓库管理员处理。');
+        }
+
         [$logaction, $data] = $this->buildRequestContext($request, $item, $fullItemType, $itemType);
 
         $item->cancelRequest($requestingUser);
@@ -331,7 +348,7 @@ class ViewAssetsController extends Controller
         if ($reservationValidator->fails()) {
             return redirect()->back()->withInput()->withErrors($reservationValidator);
         }
-
+        $request->validate(['location_id' => 'required|integer']);
         $startDate = $request->filled('start_date') ? $request->input('start_date') : null;
         $endDate = $request->filled('end_date') ? $request->input('end_date') : null;
         // Optional free-text notes the requester attaches to explain
@@ -342,7 +359,9 @@ class ViewAssetsController extends Controller
         $qty = $request->has('request-quantity')
             ? max(1, (int) $request->input('request-quantity'))
             : 1;
-
+        $location_id = $request->filled('location_id') ? $request->input('location_id') : null;
+        $approver_id = $request->filled('approver_id') ? $request->input('approver_id') : null;
+        $checkout_reason = $request->filled('checkout_reason') ? $request->input('checkout_reason') : null;
         try {
             CreateCheckoutRequestAction::run(
                 $item,
@@ -351,6 +370,9 @@ class ViewAssetsController extends Controller
                 $startDate,
                 $endDate,
                 $notes,
+                $location_id,
+                $approver_id,
+                $checkout_reason,
             );
         } catch (\App\Exceptions\ItemNotRequestable $e) {
             return redirect()->back()->with('error', trans('admin/hardware/message.requests.error'));
@@ -359,6 +381,83 @@ class ViewAssetsController extends Controller
         } catch (\App\Exceptions\DuplicateCheckoutRequest $e) {
             return redirect()->back()->with('error', trans('admin/hardware/message.requests.duplicate'));
         }
+
+        return $this->redirectAfterRequestAction($request, 'admin/hardware/message.requests.success');
+    }
+
+    /**
+     * 修改一条属于当前用户的待审批/已退回申请。
+     *
+     * 仅允许修改 state=pending 且 approval_status ∈ {pending, rejected} 的行；
+     * 已批准、已完成、已撤销、已失效 一律拒绝。修改后重置 approval_status
+     * 为 pending、fulfilled_quantity 为 0，使申请重新进入审批队列（审批人
+     * 会收到新的待办通知，通知逻辑在 Phase 4 接入）。
+     */
+    private function handleModifyRequest(Request $request, $item, string $fullItemType, string $itemType): RedirectResponse
+    {
+        $checkoutRequest = CheckoutRequest::find($request->input('request_id'));
+
+        if (! $checkoutRequest) {
+            return redirect()->back()->with('error', trans('admin/hardware/message.requests.error'));
+        }
+
+        // 所有权：只能改自己的申请。
+        if ((int) $checkoutRequest->user_id !== (int) auth()->id()) {
+            return redirect()->back()->with('error', trans('general.insufficient_permissions'));
+        }
+
+        // 状态守卫：仅待审批/已退回 可修改。
+        $modifiable = $checkoutRequest->state === CheckoutRequestState::Pending
+            && in_array(
+                $checkoutRequest->approval_status,
+                [CheckoutRequestApprovalStatus::Pending, CheckoutRequestApprovalStatus::Rejected],
+                true
+            );
+        if (! $modifiable) {
+            return redirect()->back()->with('error', '当前申请状态不允许修改。');
+        }
+
+        // 与新建一致的校验。
+        $reservationValidator = validator($request->only(['start_date', 'end_date']), [
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after_or_equal:start_date',
+        ]);
+        if ($reservationValidator->fails()) {
+            return redirect()->back()->withInput()->withErrors($reservationValidator);
+        }
+        $request->validate(['location_id' => 'required|integer']);
+
+        $startDate = $request->filled('start_date') ? $request->input('start_date') : null;
+        $endDate = $request->filled('end_date') ? $request->input('end_date') : null;
+        $notes = $request->filled('notes') ? $request->input('notes') : null;
+        $qty = $request->has('request-quantity')
+            ? max(1, (int) $request->input('request-quantity'))
+            : 1;
+        $location_id = $request->filled('location_id') ? $request->input('location_id') : null;
+        $approver_id = $request->filled('approver_id') ? $request->input('approver_id') : null;
+        $checkout_reason = $request->filled('checkout_reason') ? $request->input('checkout_reason') : null;
+
+        $checkoutRequest->update([
+            'quantity' => $qty,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'notes' => $notes,
+            'checkout_location_id' => $location_id,
+            'approver_id' => $approver_id,
+            'checkout_reason' => $checkout_reason,
+            // 重置审批轨道：重新走审批，已部分发放的数量清零。
+            'approval_status' => CheckoutRequestApprovalStatus::Pending,
+            'fulfilled_quantity' => 0,
+        ]);
+
+        // 操作日志：request updated。
+        [$logaction, $data] = $this->buildRequestContext($request, $item, $fullItemType, $itemType);
+        $data['item_quantity'] = $qty;
+        $data['note'] = $notes;
+        $logaction->logaction(ActionType::RequestUpdated);
+
+        // 站内通知：修改后申请重新进入审批队列，提醒审批人重新处理。
+        UserNotification::notifyApprovalRequested($checkoutRequest, true);
 
         return $this->redirectAfterRequestAction($request, 'admin/hardware/message.requests.success');
     }

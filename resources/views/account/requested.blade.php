@@ -33,8 +33,10 @@
                             <th scope="col" data-field="name">{{ trans('general.item_name') }}</th>
                             <th scope="col" data-field="type">{{ trans('general.type') }}</th>
                             <th scope="col" data-field="qty">{{ trans('general.qty') }}</th>
-                            <th scope="col" data-field="location">{{ trans('admin/hardware/table.location') }}</th>
-                            <th scope="col" data-field="expected_checkin" data-formatter="dateDisplayFormatter"> {{ trans('admin/hardware/form.expected_checkin') }}</th>
+                            <th scope="col" data-field="status_label" data-formatter="requestStatusFormatter">状态</th>
+                            <th scope="col" data-field="checkout_location">使用地址</th>
+                            <th scope="col" data-field="checkout_reason">申请理由</th>
+                            <th scope="col" data-field="end_date" data-formatter="dateDisplayFormatter"> {{ trans('general.end_date') }}</th>
                             <th scope="col" data-field="request_date" data-formatter="dateDisplayFormatter"> {{ trans('general.requested_date') }}</th>
 
                             @foreach(\App\Models\CustomField::get() as $field)
@@ -42,7 +44,7 @@
                                     <th scope="col" data-field="custom_fields.{{ $field->db_column }}">{{ $field->name }}</th>
                                 @endif
                             @endforeach
-                            <th scope="col" data-field="cancel_url" data-formatter="userRequestCancelFormatter" class="hidden-print">{{ trans('table.actions') }}</th>
+                            <th scope="col" data-field="cancel_url" data-formatter="userRequestActionsFormatter" class="hidden-print">{{ trans('table.actions') }}</th>
                         </tr>
                         </thead>
                     </table>
@@ -52,6 +54,8 @@
         </div> <!-- .col-md-9 -->
     </div> <!-- .row-->
 
+    {{-- 修改申请时复用的请求模态框（新建/修改共用）。 --}}
+    <x-modals.request-item />
 @stop
 @section('moar_scripts')
     @include ('partials.bootstrap-table')

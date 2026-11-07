@@ -14,6 +14,7 @@ use App\Models\Consumable;
 use App\Models\License;
 use App\Models\Setting;
 use App\Models\User;
+use App\Models\UserNotification;
 use App\Notifications\RequestAssetNotification;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
@@ -43,6 +44,8 @@ class CreateCheckoutRequestAction
      * @param  string|null  $startDate  Optional reservation window start
      * @param  string|null  $endDate  Optional reservation window end
      * @param  string|null  $notes  Optional requester note
+     * @param  int|null  $approver_id  Optional approver ID
+     * @param  string|null  $checkout_reason  Optional checkout reason
      *
      * @throws ItemNotRequestable
      * @throws AuthorizationException
@@ -55,6 +58,9 @@ class CreateCheckoutRequestAction
         ?string $startDate = null,
         ?string $endDate = null,
         ?string $notes = null,
+        ?int $location_id = null,
+        ?int $approver_id = null,
+        ?string $checkout_reason = null,
     ): bool {
         if (! $requestable->isFlaggedRequestable()) {
             throw new ItemNotRequestable;
@@ -74,6 +80,7 @@ class CreateCheckoutRequestAction
         }
 
         $now = date('Y-m-d H:i:s');
+        // dd($location_id);
         $data = [
             'item' => $requestable,
             'item_type' => strtolower(class_basename($requestable)),
@@ -86,6 +93,9 @@ class CreateCheckoutRequestAction
             'start_date' => $startDate,
             'end_date' => $endDate,
             'note' => $notes,
+            'location_id' => $location_id,
+            'approver_id' => $approver_id,
+            'checkout_reason' => $checkout_reason,
         ];
 
         $logaction = new Actionlog;
@@ -95,7 +105,7 @@ class CreateCheckoutRequestAction
         $logaction->created_by = auth()->id();
         $logaction->target_id = auth()->id();
         $logaction->target_type = User::class;
-        $logaction->location_id = $user->location_id ?? null;
+        $logaction->location_id = $location_id ?? $user->location_id ?? null;
         $logaction->logaction('requested');
 
         // Row write + counter increment share one transaction so a
@@ -105,12 +115,18 @@ class CreateCheckoutRequestAction
         // on the row is the source of truth, counter is a materialized
         // view kept in sync at write time. Only Asset carries the
         // counter column, so the increment is guarded on type.
-        DB::transaction(function () use ($requestable, $qty, $startDate, $endDate, $notes) {
-            $requestable->request($qty ?? 1, $startDate, $endDate, $notes);
+        $createdRequest = null;
+        DB::transaction(function () use ($requestable, $qty, $startDate, $endDate, $notes, $location_id, $approver_id, $checkout_reason, &$createdRequest) {
+            $createdRequest = $requestable->request($qty ?? 1, $startDate, $endDate, $notes, $location_id, $approver_id, $checkout_reason);
             if ($requestable instanceof Asset) {
                 $requestable->increment('requests_counter', 1);
             }
         });
+
+        // 站内通知：告知审批人有一条新申请待办。
+        if ($createdRequest) {
+            UserNotification::notifyApprovalRequested($createdRequest);
+        }
 
         $settings = Setting::getSettings();
         if ($settings->alert_email != '' && $settings->alerts_enabled == '1' && ! config('app.lock_passwords')) {

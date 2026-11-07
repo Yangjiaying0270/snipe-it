@@ -167,6 +167,24 @@ class AssetCheckoutController extends Controller
                 'sign_in_place' => $request->boolean('sign_in_place'),
             ]);
 
+            // 出库时把资产位置改为申请中填写的使用地址。
+            // 仅当本次出库来自某条「已批准、属于本次被领用人」的申请时生效，
+            // 避免管理员从普通出库页操作时被无关的申请数据覆盖位置。
+            $requestLocation = null;
+            if ($request->filled('request_id') && $target instanceof User) {
+                $matchedRequest = CheckoutRequest::whereKey($request->integer('request_id'))
+                    ->where('requestable_type', Asset::class)
+                    ->where('requestable_id', $asset->id)
+                    ->where('user_id', $target->id)
+                    ->where('state', 'pending')
+                    ->where('approval_status', 'approved')
+                    ->first();
+
+                if ($matchedRequest && $matchedRequest->checkout_location_id) {
+                    $requestLocation = (int) $matchedRequest->checkout_location_id;
+                }
+            }
+
             // Concurrency guard. availableForCheckout() above ran on an
             // unlocked read, so two simultaneous form submits can both
             // observe the asset as available and both proceed through
@@ -178,13 +196,13 @@ class AssetCheckoutController extends Controller
             // and then sees the asset as no longer available. Mirrors the
             // pattern in Api\AssetsController::checkout and
             // ConsumablesController::store (GHSA-x4g2-87xc-m5jm).
-            $checkedOut = DB::transaction(function () use ($asset, $target, $admin, $checkout_at, $expected_checkin, $request): bool {
+            $checkedOut = DB::transaction(function () use ($asset, $target, $admin, $checkout_at, $expected_checkin, $request, $requestLocation): bool {
                 $locked = Asset::whereKey($asset->id)->lockForUpdate()->first();
                 if (! $locked || ! $locked->availableForCheckout()) {
                     return false;
                 }
 
-                return (bool) $asset->checkOut($target, $admin, $checkout_at, $expected_checkin, $request->input('note'), $request->input('name'), null, $request->boolean('sign_in_place'));
+                return (bool) $asset->checkOut($target, $admin, $checkout_at, $expected_checkin, $request->input('note'), $request->input('name'), $requestLocation, $request->boolean('sign_in_place'));
             });
 
             if ($checkedOut) {

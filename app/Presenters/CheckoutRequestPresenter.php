@@ -161,6 +161,27 @@ class CheckoutRequestPresenter extends Presenter
                 'title' => trans('general.notes'),
                 'formatter' => 'notesFormatter',
             ], [
+                // 申请人指定的使用地址（checkout_location）。
+                // 与 requestable.location（物品本身所在位置）不同，
+                // 这是领用后的使用地址。取自 transformer 输出的
+                // checkout_location.name。
+                'field' => 'checkout_location.name',
+                'scope' => 'col',
+                'searchable' => true,
+                'sortable' => false,
+                'switchable' => true,
+                'visible' => true,
+                'title' => '使用地址',
+            ], [
+                // 申请理由（申请人在申请表单中填写的 checkout_reason）。
+                'field' => 'checkout_reason',
+                'scope' => 'col',
+                'searchable' => true,
+                'sortable' => false,
+                'switchable' => true,
+                'visible' => true,
+                'title' => '申请理由',
+            ], [
                 'field' => 'user',
                 'scope' => 'col',
                 'searchable' => true,

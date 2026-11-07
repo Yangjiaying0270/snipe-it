@@ -413,12 +413,12 @@ Route::group(['prefix' => 'admin', 'middleware' => ['auth', 'authorize:superuser
 
     Route::get('/settings/labels/create', [LabelsController::class, 'create'])
         ->name('settings.labels.create')
-        ->breadcrumbs(fn(Trail $trail) => $trail->parent('settings.labels.index')
+        ->breadcrumbs(fn (Trail $trail) => $trail->parent('settings.labels.index')
             ->push(ucfirst(trans('general.create')), route('settings.labels.create')));
     Route::get('/settings/labels/{label}/edit', [LabelsController::class, 'edit'])
         ->name('settings.labels.edit')
-        ->breadcrumbs(fn(Trail $trail) => $trail->parent('settings.labels.index')
-            ->push(ucfirst(trans('general.edit')), route('settings.labels.edit', request()->route('label'))));;
+        ->breadcrumbs(fn (Trail $trail) => $trail->parent('settings.labels.index')
+            ->push(ucfirst(trans('general.edit')), route('settings.labels.edit', request()->route('label'))));
     Route::post('/settings/labels', [LabelsController::class, 'store'])
         ->name('settings.labels.store');
     Route::put('/settings/labels/{label}', [LabelsController::class, 'update'])
@@ -631,8 +631,24 @@ Route::group(['prefix' => 'account', 'middleware' => ['auth']], function () {
     Route::post('request-asset/{asset}', [ViewAssetsController::class, 'store'])
         ->name('account.request-asset');
 
+    // 站内通知：关闭登录提醒弹窗时把当前用户的未读全部置为已读。
+    Route::post('notifications/mark-read', [ProfileController::class, 'markNotificationsRead'])
+        ->name('account.notifications.mark-read');
+
     Route::post('request-asset/{asset}/cancel', [ViewAssetsController::class, 'destroy'])
         ->name('account.request-asset.cancel');
+
+    // 归还申请：用户在「View Assigned Items」对自己的资产发起 / 撤销归还。
+    Route::post('return-request/{asset}', [\App\Http\Controllers\Account\AssetReturnRequestController::class, 'store'])
+        ->name('account.return-request.store');
+    Route::post('return-request/{returnRequest}/cancel', [\App\Http\Controllers\Account\AssetReturnRequestController::class, 'destroy'])
+        ->name('account.return-request.cancel');
+
+    // 消息列表：当前用户收到的全部站内通知（含已读）。
+    Route::get('notifications', [ProfileController::class, 'notifications'])
+        ->name('account.notifications.index')
+        ->breadcrumbs(fn (Trail $trail) => $trail->parent('home')
+            ->push('我的消息', route('account.notifications.index')));
 
     // Accepts POST (from the /account/requestable request-item form)
     // AND DELETE (from the shared dataConfirmModal on /requests
@@ -719,6 +735,24 @@ Route::group(['middleware' => ['auth']], function () {
 
     Route::post('requests/bulk-cancel', [\App\Http\Controllers\Assets\AssetsController::class, 'bulkCancelRequests'])
         ->name('requests.bulk-cancel');
+
+    // 审批流程：只有被申请人指定为审批人（approver_id）的人可以批准/退回。
+    // 批准只把 approval_status 改为 approved，申请转交仓库出库；
+    // 退回只把 approval_status 改为 rejected，申请回到申请人处。
+    // 两个动作都不改写 approver_id。
+    Route::post('requests/{id}/approve', [\App\Http\Controllers\Assets\AssetsController::class, 'approveRequest'])
+        ->name('requests.approve');
+    Route::post('requests/{id}/reject', [\App\Http\Controllers\Assets\AssetsController::class, 'rejectRequest'])
+        ->name('requests.reject');
+
+    // 归还请求队列：超级用户 + 仓库管理员（checkout_request.warehouse_admin_id）。
+    // 列表页本身无写操作；签入通过每行的「签入」按钮跳转到标准
+    // check-in 页面完成（携带 return_request_id 供回写）。
+    Route::get('return-requests', [\App\Http\Controllers\AssetReturnRequestsController::class, 'index'])
+        ->name('return-requests.index')
+        ->breadcrumbs(fn (Trail $trail) => $trail->parent('home')
+            ->push('归还请求', route('return-requests.index'))
+        );
 });
 
 Route::group(['prefix' => 'reports', 'middleware' => ['auth']], function () {

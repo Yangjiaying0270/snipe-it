@@ -3405,7 +3405,26 @@
                 '</a>';
         }
 
-        if (permissions.checkout && row.requestable) {
+        // 非超管用户（审批人）显示"批准"/"退回"按钮，替代签入/签出。
+        // 超管保留原有的签入/签出逻辑不变。
+        if (permissions.approve) {
+            var approveUrl = '{{ config('app.url') }}/requests/' + row.id + '/approve';
+            actions += ' <form method="POST" action="' + approveUrl + '" style="display:inline;margin:0">' +
+                '{{ csrf_field() }}' +
+                '<button type="submit" class="actions btn btn-sm btn-success" data-tooltip="true" title="批准">' +
+                '<i class="fa fa-check fa-fw" aria-hidden="true"></i><span class="sr-only">批准</span></button>' +
+                '</form>';
+        }
+        if (permissions.reject) {
+            var rejectUrl = '{{ config('app.url') }}/requests/' + row.id + '/reject';
+            actions += ' <form method="POST" action="' + rejectUrl + '" style="display:inline;margin:0">' +
+                '{{ csrf_field() }}' +
+                '<button type="submit" class="actions btn btn-sm btn-warning" data-tooltip="true" title="退回">' +
+                '<i class="fa fa-undo fa-fw" aria-hidden="true"></i><span class="sr-only">退回</span></button>' +
+                '</form>';
+        }
+
+        if (!permissions.approve && permissions.checkout && row.requestable) {
             // Route per requestable type. The old code hardcoded
             // /hardware/{id}/checkout which 404'd (or worse, opened
             // the wrong asset) for non-Asset rows. Component
@@ -3516,7 +3535,7 @@
                 }
             }
         }
-        else if (permissions.checkin && row.requestable) {
+        else if (!permissions.approve && permissions.checkin && row.requestable) {
             actions += ' <a href="{{ config('app.url') }}/hardware/' + row.requestable.id +
                 '/checkin" class="btn btn-sm bg-purple" data-tooltip="true" title="{{ trans('general.checkin_tooltip') }}">' +
                 '<x-icon type="checkin" class="fa-fw" /><span class="sr-only">{{ trans('general.checkin') }}</span></a>';
@@ -3570,14 +3589,96 @@
     // segments stay in sync with the route regex), which the user
     // owns because ProfileController::requestedAssets scopes to the
     // authed user in the first place.
-    function userRequestCancelFormatter(value, row) {
+    // 我的申请：状态徽章
+    function requestStatusFormatter(value, row) {
         if (!value) {
             return '';
         }
-        return '<form style="display:inline;" method="POST" action="' + value + '" accept-charset="utf-8">' +
-            '<input type="hidden" name="_token" value="' + $('meta[name="csrf-token"]').attr('content') + '">' +
-            '<button class="btn btn-danger btn-sm" data-tooltip="true" title="{{ trans('general.cancel_request') }}">{{ trans('button.cancel') }}</button>' +
-            '</form>';
+        var color = row.status_color || 'default';
+        return '<span class="label label-' + color + '">' + value + '</span>';
+    }
+
+    // 我的申请：操作列。仅待审批/已退回 显示"修改"和"取消"；
+    // 已批准/已完成/已撤销/已失效 不显示任何操作。
+    // 修改按钮把当前行的可编辑字段塞进 data-* 属性，
+    // 由 snipeit.js 的 .modify-request 处理器预填模态框。
+    function userRequestActionsFormatter(value, row) {
+        var html = '';
+        if (!value) {
+            return html;
+        }
+
+        if (row.can_modify) {
+            var endDate = (row.end_date && row.end_date.date) ? row.end_date.date : '';
+            html += '<button type="button" class="btn btn-warning btn-sm modify-request" ' +
+                'data-request-url="' + value + '" ' +
+                'data-item-name="' + (row.name || '') + '" ' +
+                'data-item-type="' + (row.type || '') + '" ' +
+                'data-request-id="' + row.id + '" ' +
+                'data-qty="' + row.qty + '" ' +
+                'data-end-date="' + endDate + '" ' +
+                'data-checkout-reason="' + (row.checkout_reason || '') + '" ' +
+                'data-location-id="' + (row.checkout_location_id || '') + '" ' +
+                'data-location-name="' + (row.checkout_location || '') + '" ' +
+                'data-approver-id="' + (row.approver_id || '') + '" ' +
+                'data-approver-name="' + (row.approver_name || '') + '" ' +
+                'data-notes="' + (row.notes || '') + '">' +
+                '{{ trans('button.edit') }}' +
+                '</button> ';
+        }
+
+        if (row.can_cancel) {
+            html += '<form style="display:inline;" method="POST" action="' + value + '" accept-charset="utf-8">' +
+                '<input type="hidden" name="_token" value="' + $('meta[name="csrf-token"]').attr('content') + '">' +
+                '<button class="btn btn-danger btn-sm" data-tooltip="true" title="{{ trans('general.cancel_request') }}">{{ trans('button.cancel') }}</button>' +
+                '</form>';
+        }
+
+        return html;
+    }
+
+    // 「View Assigned Items」归还列。row.return_request 由
+    // Api\ProfileController::assets 输出：can_create=true 时渲染
+    // 归还按钮（弹窗提交），已有 pending 申请时渲染撤销按钮。
+    function returnRequestActionsFormatter(value, row) {
+        var html = '';
+        if (!row || !row.return_request) {
+            return html;
+        }
+
+        var assetName = (row.asset_tag || '') + (row.name ? ' ' + row.name : '');
+
+        if (row.return_request.can_create) {
+            html += '<button type="button" class="btn btn-primary btn-sm request-return" ' +
+                'data-return-url="{{ config('app.url') }}/account/return-request/' + row.id + '" ' +
+                'data-asset-name="' + assetName.replace(/"/g, '&quot;') + '" ' +
+                'data-tooltip="true" title="申请归还">' +
+                '<i class="fas fa-undo fa-fw" aria-hidden="true"></i> 归还' +
+                '</button>';
+        } else {
+            html += '<form style="display:inline;" method="POST" ' +
+                'action="{{ config('app.url') }}/account/return-request/' + row.return_request.request_id + '/cancel" accept-charset="utf-8">' +
+                '<input type="hidden" name="_token" value="' + $('meta[name="csrf-token"]').attr('content') + '">' +
+                '<button class="btn btn-default btn-sm" data-tooltip="true" title="撤销归还申请">' +
+                '<i class="fas fa-times fa-fw" aria-hidden="true"></i> 撤销归还' +
+                '</button></form>' +
+                ' <span class="label label-warning">待签入</span>';
+        }
+
+        return html;
+    }
+
+    // 归还请求队列操作列。「签入」跳转标准 check-in 页面并携带
+    // return_request_id，check-in 成功后控制器据此关闭归还申请。
+    function returnRequestQueueActionsFormatter(value, row) {
+        if (!row || !row.asset || !row.available_actions || !row.available_actions.checkin) {
+            return '';
+        }
+
+        return '<a href="{{ config('app.url') }}/hardware/' + row.asset.id + '/checkin?return_request_id=' + row.id + '" ' +
+            'class="btn btn-sm bg-maroon" data-tooltip="true" title="签入该资产">' +
+            '<i class="fas fa-check fa-fw" aria-hidden="true"></i> 签入' +
+            '</a>';
     }
 
     // Check if checkbox should be selectable

@@ -351,10 +351,18 @@
                     @foreach ($field_array as $db_column => $field_name)
                         <th scope="col" data-field="custom_fields.{{ $db_column }}" data-formatter="customFieldsFormatter" data-cell-style="customFieldsCellStyle" data-sortable="true" data-visible="true">{{ $field_name }}</th>
                     @endforeach
+                    @if (!request()->filled('user_id') || auth()->user()->id == $user->id)
+                        <th scope="col" data-field="return_request" data-formatter="returnRequestActionsFormatter" data-sortable="false" data-visible="true" class="hidden-print">归还</th>
+                    @endif
                 </tr>
                 </thead>
             </table>
           </div><!-- /asset -->
+
+          {{-- 归还申请弹窗：仅本人查看自己的资产时渲染。 --}}
+          @if (!request()->filled('user_id') || auth()->user()->id == $user->id)
+              <x-modals.return-request />
+          @endif
 
 
           <div class="tab-pane" id="licenses">

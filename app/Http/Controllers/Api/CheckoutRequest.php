@@ -47,19 +47,30 @@ class CheckoutRequest extends Controller
      */
     public function index(Request $request): array
     {
-        // Endpoint-level gate: allow through when the caller can
-        // checkout at least one of the five checkoutable types.
-        // The canCheckoutAtLeastOneItemType gate (see AuthServiceProvider)
-        // wraps that OR - reused here + on the nav link in
-        // layouts/default.blade.php so both surfaces answer the
-        // "should this user see /requests at all?" question
-        // identically.
-        $this->authorize('canCheckoutAtLeastOneItemType');
+        // Endpoint-level gate: approvers without checkout rights still
+        // need to reach the requests assigned to them, and the
+        // warehouse admin needs approved rows. See the
+        // viewPendingRequests gate in AuthServiceProvider.
+        $this->authorize('viewPendingRequests');
 
         $user = auth()->user();
 
-        $query = CheckoutRequestModel::with('user', 'requestedItem')
+        $query = CheckoutRequestModel::with('user', 'requestedItem', 'checkoutLocation')
             ->pending();
+
+        // 队列隔离：
+        // - 超管：全部 pending，保留全局视野
+        // - 仓库管理员：只看审批通过、等待签出的申请
+        // - 审批人：只看分配给自己且尚未审核的申请
+        $warehouseAdminId = (int) config('checkout_request.warehouse_admin_id');
+
+        if (! $user->isSuperUser()) {
+            if ((int) $user->id === $warehouseAdminId) {
+                $query->awaitingWarehouse();
+            } else {
+                $query->where('approver_id', $user->id)->awaitingApproval();
+            }
+        }
 
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->integer('user_id'));
@@ -91,7 +102,7 @@ class CheckoutRequest extends Controller
 
         if (Company::isFullMultipleCompanySupportEnabled() && ! auth()->user()->isSuperUser()) {
             $requests = $requests->filter(function (CheckoutRequestModel $r): bool {
-                if (!$r->requestable || !Company::isCurrentUserHasAccess($r->requestable)) {
+                if (! $r->requestable || ! Company::isCurrentUserHasAccess($r->requestable)) {
                     return false;
                 }
 
@@ -119,6 +130,12 @@ class CheckoutRequest extends Controller
         // since Gate short-circuits true for them anyway.
         if (! $user->isSuperUser()) {
             $requests = $requests->filter(function (CheckoutRequestModel $r) use ($user): bool {
+                // 分配给自己审批的记录始终可见：审批人只需要批准/退回，
+                // 不需要具备 checkout 权限。
+                if ((int) $r->approver_id === (int) $user->id) {
+                    return true;
+                }
+
                 if (! $r->requestable_type) {
                     return false;
                 }

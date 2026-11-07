@@ -65,7 +65,7 @@ class License extends Depreciable implements Importable
      */
     protected function serial(): Attribute
     {
-        return Attribute::get(fn($value) => $value !== null && !Gate::allows('viewKeys', $this)
+        return Attribute::get(fn ($value) => $value !== null && ! Gate::allows('viewKeys', $this)
             ? self::PRODUCT_KEY_MASK
             : $value
         );
