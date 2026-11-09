@@ -47,8 +47,10 @@ dnsutils \
 && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 
-RUN curl -L -O https://github.com/pear/pearweb_phars/raw/master/go-pear.phar
-RUN php go-pear.phar
+# PEAR is not used anywhere else in this image, and the download from GitHub
+# frequently stalls in restricted networks. Keep it disabled.
+# RUN curl -L -O https://github.com/pear/pearweb_phars/raw/master/go-pear.phar
+# RUN php go-pear.phar
 
 RUN phpenmod gd
 RUN phpenmod bcmath
@@ -97,7 +99,10 @@ WORKDIR /var/www/html
 # COPY docker/*.php /var/www/html/app/config/production/
 COPY docker/docker.env /var/www/html/.env
 
-RUN chown -R docker /var/www/html
+# Some build environments (e.g. Synology DSM) strip file modes from the build
+# context, so copied files end up with 000 permissions. Restore sane modes
+# before running composer as the unprivileged docker user.
+RUN chown -R docker /var/www/html && chmod -R u+rwX,go+rX /var/www/html
 
 RUN \
 	rm -r "/var/www/html/storage/private_uploads" && ln -fs "/var/lib/snipeit/data/private_uploads" "/var/www/html/storage/private_uploads" \
