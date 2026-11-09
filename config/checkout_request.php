@@ -13,6 +13,6 @@ return [
     |
     */
 
-    'warehouse_admin_id' => (int) env('CHECKOUT_WAREHOUSE_ADMIN_ID', 40),
+    'warehouse_admin_id' => (int) env('CHECKOUT_WAREHOUSE_ADMIN_ID', 42),
 
 ];
