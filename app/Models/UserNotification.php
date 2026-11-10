@@ -141,7 +141,7 @@ class UserNotification extends Model
             self::TYPE_ASSET_DUE,
             self::TYPE_EXTEND_APPROVED,
             self::TYPE_EXTEND_REJECTED,
-            self::TYPE_ASSET_RETURNED => route('account.assets'),
+            self::TYPE_ASSET_RETURNED => route('view-assets'),
 
             // 抄送人视角 → 没有强目标，回到控制台
             self::TYPE_CONSUMABLE_FULFILLED => route('home'),

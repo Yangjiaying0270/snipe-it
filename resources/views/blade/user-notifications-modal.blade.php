@@ -1,119 +1,123 @@
-{{-- 登录后首次弹窗：按类型分组 + 每组整行可点击跳转。 --}}
+@props([])
 
-@php
-    $grouped = $unread->groupBy(fn ($n) => $n->groupLabel());
-    $total = $unread->count();
-@endphp
+{{-- 登录后的站内提醒弹窗。
+     1. 按类型分组展示（例如「审批通过 2 条」），每组整行可点击跳 targetUrl。
+     2. 弹窗只留「我知道了」一个按钮；关闭后把当前未读全部标记为已读，
+        避免新页面仍读到未读而重复弹窗。
+     3. $unread 由 UserNotification 做请求级缓存，与铃铛角标共用一次查询。 --}}
+@if (auth()->check() && ! ($unread = \App\Models\UserNotification::unreadFor((int) auth()->id()))->isEmpty())
+    @php
+        $grouped = $unread->groupBy(fn ($n) => $n->groupLabel());
+    @endphp
 
-<div class="modal fade" id="notificationsModal" tabindex="-1" role="dialog" aria-labelledby="notificationsModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <button type="button" class="close notification-dismiss" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-                <h4 class="modal-title" id="notificationsModalLabel">
-                    <i class="fas fa-bell"></i>
-                    共 {{ $total }} 条未读消息
-                </h4>
-            </div>
-            <div class="modal-body">
-                @if ($grouped->isEmpty())
-                    <p class="text-muted text-center">没有新消息。</p>
-                @else
+    <div class="modal fade" id="notificationsModal" tabindex="-1" role="dialog" aria-labelledby="notificationsModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close notification-dismiss" data-dismiss="modal" aria-label="{{ trans('general.close') }}">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                    <h4 class="modal-title" id="notificationsModalLabel">
+                        <x-icon type="bell" class="fa-fw" />
+                        共 {{ $unread->count() }} 条未读消息
+                    </h4>
+                </div>
+                <div class="modal-body">
                     <div class="list-group">
                         @foreach ($grouped as $label => $items)
                             @php
-                                // 组内所有通知 type 相同（groupLabel() 按 type 分组），
-                                // 取第一条的 targetUrl 作为点击跳转目标。
+                                // 组内通知 type 同组，取第一条的 targetUrl 作为跳转目标。
                                 $url = $items->first()->targetUrl();
                             @endphp
                             <a href="{{ $url }}"
-                               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center notification-group-link">
-                                <div>
-                                    <h4 class="list-group-item-heading" style="margin-bottom: 2px;">
-                                        {{ $label }}
-                                    </h4>
-                                    <p class="list-group-item-text text-muted" style="margin-bottom: 0;">
-                                        {{ $items->count() === 1
-                                            ? $items->first()->body
-                                            : $items->first()->body.' 等 '.$items->count().' 条' }}
-                                    </p>
-                                </div>
-                                <span>
+                               class="list-group-item notification-group-link">
+                                <div class="pull-right">
                                     <span class="badge badge-warning">{{ $items->count() }}</span>
                                     <i class="fas fa-chevron-right text-muted" style="margin-left: 8px;"></i>
-                                </span>
+                                </div>
+                                <h4 class="list-group-item-heading" style="margin-bottom: 2px;">
+                                    {{ $label }}
+                                </h4>
+                                <p class="list-group-item-text text-muted" style="margin-bottom: 0;">
+                                    {{ $items->count() === 1
+                                        ? $items->first()->body
+                                        : $items->first()->body.' 等 '.$items->count().' 条' }}
+                                </p>
                             </a>
                         @endforeach
                     </div>
-                @endif
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-default notification-dismiss" data-dismiss="modal">
-                    {{ trans('general.got_it', default: '我知道了') }}
-                </button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary notification-dismiss" data-dismiss="modal">
+                        <x-icon type="checkmark" class="fa-fw" />
+                        {{ trans('general.got_it') }}
+                    </button>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<style>
-    .notification-group-link {
-        transition: background-color 0.15s;
-    }
-    .notification-group-link:hover {
-        background-color: #f0f6ff;
-        text-decoration: none;
-    }
-</style>
-
-<script>
-    $(function () {
-        var $modal = $('#notificationsModal');
-
-        /**
-         * 向服务器 POST /account/notifications/mark-read，失败也不阻塞。
-         */
-        function markAllRead() {
-            $.post("{{ route('account.notifications.mark-read') }}", {
-                _token: $('meta[name="csrf-token"]').attr('content'),
-            }).fail(function () { /* silent */ });
+    <style>
+        .notification-group-link {
+            transition: background-color 0.15s;
+            white-space: normal;
         }
+        .notification-group-link:hover {
+            background-color: #f0f6ff;
+            text-decoration: none;
+        }
+    </style>
 
-        /**
-         * 把一个 a.link-group-item 里的每条通知置为已读，然后跳转。
-         */
-        function markGroupReadBeforeNavigate($link, href) {
-            $link.addClass('disabled').css('pointer-events', 'none');
-            $link.find('.list-group-item-heading').append(' <i class="fas fa-spinner fa-spin"></i>');
+    <script>
+        (function () {
+            var markReadUrl = @json(route('account.notifications.mark-read'));
+            var csrfToken = @json(csrf_token());
+            var markedRead = false;
 
-            // 标记已读后再跳转（避免 race-condition：弹窗的 markAllRead
-            // 还没发出请求，另一个请求又读到未读状态）。
-            $.when(
-                $.post("{{ route('account.notifications.mark-read') }}", {
-                    _token: $('meta[name="csrf-token"]').attr('content'),
-                })
-            ).always(function () {
-                window.location.href = href;
+            /** 全部置已读，只发一次请求；失败也不阻塞。 */
+            function markAllRead(done) {
+                if (markedRead) {
+                    if (typeof done === 'function') { done(); }
+                    return;
+                }
+                markedRead = true;
+                jQuery.ajax({
+                    type: 'POST',
+                    url: markReadUrl,
+                    data: { _token: csrfToken },
+                    complete: function () {
+                        jQuery('.notifications-menu').remove();
+                        if (typeof done === 'function') { done(); }
+                    }
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', function () {
+                var element = document.getElementById('notificationsModal');
+                if (!element || typeof jQuery === 'undefined') {
+                    return;
+                }
+
+                var modal = jQuery(element);
+                modal.modal('show');
+
+                // 点击分组整行 → 置已读后跳转该组的 targetUrl
+                modal.find('.notification-group-link').on('click', function (e) {
+                    e.preventDefault();
+                    var href = this.getAttribute('href');
+                    markAllRead(function () { window.location.href = href; });
+                });
+
+                // 「我知道了」→ 全部置已读
+                modal.find('.notification-dismiss').on('click', function () {
+                    markAllRead();
+                });
+
+                // X / 点遮罩等其它关闭路径也兜底标记已读
+                modal.on('hidden.bs.modal', function () {
+                    markAllRead();
+                });
             });
-        }
-
-        // 点击分组 = 置已读 + 跳转
-        $modal.on('click', '.notification-group-link', function (e) {
-            e.preventDefault();
-            var href = $(this).attr('href');
-            markGroupReadBeforeNavigate($(this), href);
-        });
-
-        // 点「我知道了」或右上角关闭 → 全部置已读
-        $modal.on('click', '.notification-dismiss', function () {
-            markAllRead();
-        });
-
-        // 点遮罩也全部置已读，保证"只弹一次"
-        $modal.on('hidden.bs.modal', function () {
-            markAllRead();
-        });
-    });
-</script>
+        })();
+    </script>
+@endif

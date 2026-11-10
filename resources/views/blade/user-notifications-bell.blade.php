@@ -18,7 +18,7 @@
                     @foreach ($unread as $notification)
                         <li>
                             <a href="{{ $notification->targetUrl() }}" class="bell-notification-link"
-                               data-notification-id="{{ $notification->id }}"
+                               data-read-url="{{ route('account.notifications.read', $notification->id) }}"
                                style="white-space: normal;">
                                 <strong>{{ $notification->title }}</strong>
                                 @if ($notification->body)
@@ -36,33 +36,46 @@
     </li>
 
     <script>
-        $(function () {
-            // 点击单条通知 → 置已读 + 跳 targetUrl
-            $('.bell-notification-link').on('click', function (e) {
-                var $link = $(this);
-                var id = $link.data('notification-id');
-                e.preventDefault();
-                $.when(
-                    $.post("{{ route('account.notifications.read') }}", {
-                        notification: id,
-                        _token: $('meta[name="csrf-token"]').attr('content'),
-                    })
-                ).always(function () {
-                    window.location.href = $link.attr('href');
-                });
-            });
+        (function () {
+            var markAllUrl = @json(route('account.notifications.mark-read'));
+            var csrfToken = @json(csrf_token());
 
-            // 点「查看全部消息」→ 全部置已读后跳转
-            $('#bell-view-all').on('click', function (e) {
-                e.preventDefault();
-                $.when(
-                    $.post("{{ route('account.notifications.mark-read') }}", {
-                        _token: $('meta[name="csrf-token"]').attr('content'),
-                    })
-                ).always(function () {
-                    window.location.href = $(this).attr('href');
+            document.addEventListener('DOMContentLoaded', function () {
+                if (typeof jQuery === 'undefined') {
+                    return;
+                }
+
+                // 点击单条通知 → 置已读 + 跳 targetUrl
+                jQuery('.bell-notification-link').on('click', function (e) {
+                    e.preventDefault();
+                    var href = this.getAttribute('href');
+                    var readUrl = this.getAttribute('data-read-url');
+
+                    jQuery.ajax({
+                        type: 'POST',
+                        url: readUrl,
+                        data: { _token: csrfToken },
+                        complete: function () {
+                            window.location.href = href;
+                        }
+                    });
+                });
+
+                // 点「查看全部消息」→ 全部置已读后跳转
+                jQuery('#bell-view-all').on('click', function (e) {
+                    e.preventDefault();
+                    var href = this.getAttribute('href');
+
+                    jQuery.ajax({
+                        type: 'POST',
+                        url: markAllUrl,
+                        data: { _token: csrfToken },
+                        complete: function () {
+                            window.location.href = href;
+                        }
+                    });
                 });
             });
-        });
+        })();
     </script>
 @endif
