@@ -644,6 +644,20 @@ Route::group(['prefix' => 'account', 'middleware' => ['auth']], function () {
     Route::post('return-request/{returnRequest}/cancel', [\App\Http\Controllers\Account\AssetReturnRequestController::class, 'destroy'])
         ->name('account.return-request.cancel');
 
+    // 延期申请：用户对名下资产提交归还日延期请求。
+    Route::get('requests/{asset}/extend', [\App\Http\Controllers\Account\AccountExtendController::class, 'create'])
+        ->name('account.requests.extend.create');
+    Route::post('requests/{asset}/extend', [\App\Http\Controllers\Account\AccountExtendController::class, 'store'])
+        ->name('account.requests.extend.store');
+
+    // 耗材领用申请：直接进入仓库出库队列（approval_status = auto_approved）。
+    Route::post('consumables/{consumable}/request', [\App\Http\Controllers\Account\ConsumableRequestController::class, 'store'])
+        ->name('account.consumables.request');
+
+    // 单条通知置已读（用户点击某个通知或分组时调用）。
+    Route::post('notifications/{notification}/read', [ProfileController::class, 'markOneNotificationRead'])
+        ->name('account.notifications.read');
+
     // 消息列表：当前用户收到的全部站内通知（含已读）。
     Route::get('notifications', [ProfileController::class, 'notifications'])
         ->name('account.notifications.index')

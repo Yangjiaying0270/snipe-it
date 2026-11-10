@@ -213,6 +213,16 @@ class ProfileController extends Controller
                 'can_create' => $pendingRequest === null,
                 'request_id' => $pendingRequest?->id,
             ];
+
+            // 归还状态 badge 数据 + 是否允许提交延期申请。
+            // extends 字段来自 Asset::returnStatus() 访问器，
+            // Blade bootstrap-table 里的 returnStatusFormatter 负责渲染。
+            $asset = $assets->find($row['id']);
+            if ($asset) {
+                $status = $asset->returnStatus();
+                $row['return_status'] = $status;
+                $row['can_extend'] = $status['extendable'];
+            }
         }
         unset($row);
 

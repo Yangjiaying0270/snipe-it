@@ -184,6 +184,16 @@
                             @endcan
                             <x-button.delete :item="$consumable"/>
                             <x-button.checkout :item="$consumable" :route="route('consumables.checkout.show', $consumable->id)" />
+                            {{-- 普通用户申请领用（无 checkout 权限但有 request 权限时显示） --}}
+                            @can('request', \App\Models\Consumable::class)
+                                @cannot('checkout', $consumable)
+                                    <button type="button" class="btn btn-sm btn-info" data-toggle="modal" data-target="#consumableRequestModal"
+                                            data-tooltip="true" title="申请领用" data-placement="top">
+                                        <i class="fa fa-paper-plane fa-fw"></i>
+                                        <span class="sr-only">申请领用</span>
+                                    </button>
+                                @endcannot
+                            @endcan
                         @endif
                     </x-slot:buttons>
 
@@ -191,6 +201,54 @@
             </x-box>
         </x-page-column>
     </x-container>
+
+    {{-- 耗材领用申请 Modal --}}
+    @can('request', \App\Models\Consumable::class)
+        @cannot('checkout', $consumable)
+        <div class="modal fade" id="consumableRequestModal" tabindex="-1" role="dialog" aria-labelledby="consumableRequestModalLabel">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <form method="POST" action="{{ route('account.consumables.request', $consumable) }}" accept-charset="utf-8">
+                        {{ csrf_field() }}
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal" aria-label="关闭">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                            <h4 class="modal-title" id="consumableRequestModalLabel">
+                                申请领用：{{ $consumable->name }}
+                                <small class="text-muted">(剩余 {{ (int) $consumable->numRemaining() }})</small>
+                            </h4>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label for="req_qty" class="control-label required">数量 <span class="text-red">*</span></label>
+                                <input type="number" name="quantity" id="req_qty" class="form-control"
+                                       min="1" max="{{ (int) $consumable->numRemaining() }}" value="1" required>
+                                <span class="help-block">最多可申请 {{ (int) $consumable->numRemaining() }} 个</span>
+                            </div>
+                            <div class="form-group">
+                                <label for="req_purpose" class="control-label required">用途 <span class="text-red">*</span></label>
+                                <textarea name="purpose" id="req_purpose" rows="2" class="form-control"
+                                          placeholder="简要说明领用用途" required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="req_notes" class="control-label">备注（可选）</label>
+                                <textarea name="notes" id="req_notes" rows="2" class="form-control"
+                                          placeholder="补充说明（可选）"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-default" data-dismiss="modal">取消</button>
+                            <button type="submit" class="btn btn-info">
+                                <i class="fa fa-paper-plane fa-fw"></i> 提交申请
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        @endcannot
+    @endcan
 
 @endsection
 

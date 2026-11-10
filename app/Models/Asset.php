@@ -1058,6 +1058,104 @@ class Asset extends Depreciable implements Importable
         );
     }
 
+    /**
+     * 资产生命周期状态，用于"我名下的资产"行尾 badge 渲染。
+     *
+     * 返回数组结构，便于 Blade 直接消费：
+     *   label      中文标签（未到期 / 即将到期 / 待归还 / 已提交延期申请 / 已延期 / 已提交归还申请）
+     *   color      Bootstrap 3 badge 颜色类（success/warning/danger/default）
+     *   overdue    是否超期（true 时附加感叹号图标）
+     *   extendable 是否允许用户提交延期申请（已超期或临近到期且无 pending 延期）
+     *   due_days   距到期的天数（负数表示已逾期）
+     */
+    public function returnStatus(): array
+    {
+        $pendingExtension = \App\Models\CheckoutRequest::query()
+            ->where('requestable_type', self::class)
+            ->where('requestable_id', $this->id)
+            ->where('extended_asset_id', $this->id)
+            ->open()
+            ->extensions()
+            ->first();
+
+        if ($pendingExtension) {
+            return [
+                'label' => '已提交延期申请',
+                'color' => 'default',
+                'overdue' => false,
+                'extendable' => false,
+                'due_days' => null,
+            ];
+        }
+
+        $pendingReturn = \App\Models\AssetReturnRequest::query()
+            ->where('asset_id', $this->id)
+            ->whereIn('state', [\App\Enums\AssetReturnRequestState::Pending->value])
+            ->first();
+
+        if ($pendingReturn) {
+            return [
+                'label' => '已提交归还申请',
+                'color' => 'default',
+                'overdue' => false,
+                'extendable' => false,
+                'due_days' => null,
+            ];
+        }
+
+        if (! $this->expected_checkin) {
+            return [
+                'label' => '未设置归还日',
+                'color' => 'default',
+                'overdue' => false,
+                'extendable' => false,
+                'due_days' => null,
+            ];
+        }
+
+        $now = Carbon::now()->startOfDay();
+        $due = Carbon::parse($this->expected_checkin)->startOfDay();
+        $dueDays = (int) $now->diffInDays($due, false);
+
+        if ($dueDays < 0) {
+            return [
+                'label' => '待归还（已逾期）',
+                'color' => 'danger',
+                'overdue' => true,
+                'extendable' => true,
+                'due_days' => $dueDays,
+            ];
+        }
+
+        if ($dueDays === 0) {
+            return [
+                'label' => '今天到期',
+                'color' => 'danger',
+                'overdue' => true,
+                'extendable' => true,
+                'due_days' => 0,
+            ];
+        }
+
+        if ($dueDays <= 7) {
+            return [
+                'label' => '即将到期（'.$dueDays.' 天后）',
+                'color' => 'warning',
+                'overdue' => false,
+                'extendable' => true,
+                'due_days' => $dueDays,
+            ];
+        }
+
+        return [
+            'label' => '未到期',
+            'color' => 'success',
+            'overdue' => false,
+            'extendable' => false,
+            'due_days' => $dueDays,
+        ];
+    }
+
     public function isDeletable()
     {
 

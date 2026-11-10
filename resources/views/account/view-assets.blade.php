@@ -351,6 +351,7 @@
                     @foreach ($field_array as $db_column => $field_name)
                         <th scope="col" data-field="custom_fields.{{ $db_column }}" data-formatter="customFieldsFormatter" data-cell-style="customFieldsCellStyle" data-sortable="true" data-visible="true">{{ $field_name }}</th>
                     @endforeach
+                    <th scope="col" data-field="return_status" data-formatter="returnStatusFormatter" data-sortable="false" data-visible="true" class="hidden-print">归还状态</th>
                     @if (!request()->filled('user_id') || auth()->user()->id == $user->id)
                         <th scope="col" data-field="return_request" data-formatter="returnRequestActionsFormatter" data-sortable="false" data-visible="true" class="hidden-print">归还</th>
                     @endif

@@ -25,7 +25,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('backup:clean')->daily();
         $schedule->command('auth:clear-resets')->everyFifteenMinutes();
         $schedule->command('saml:clear_expired_nonces')->weekly();
-        
+
         $schedule->command('snipeit:pull-inventory')
             ->daily()
             ->withoutOverlapping();
@@ -35,6 +35,12 @@ class Kernel extends ConsoleKernel
         // adapter's pull runs long.
         $schedule->command('snipeit:push-inventory')
             ->dailyAt('03:00')
+            ->withoutOverlapping();
+
+        // 资产生命周期：每天早上 9 点给到期/临近到期资产的使用人
+        // 写一条站内通知（幂等，同一资产同一天只发一次）。
+        $schedule->command('snipeit:asset-due-reminders')
+            ->dailyAt('09:00')
             ->withoutOverlapping();
     }
 

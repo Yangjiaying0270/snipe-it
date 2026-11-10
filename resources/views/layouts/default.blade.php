@@ -293,10 +293,26 @@
 
                                         <!-- User assets -->
                                         @can('self.profile')
+                                        @php
+                                            $assetAlertCount = \App\Models\UserNotification::query()
+                                                ->where('user_id', (int) auth()->id())
+                                                ->whereIn('type', [
+                                                    \App\Models\UserNotification::TYPE_ASSET_DUE,
+                                                    \App\Models\UserNotification::TYPE_EXTEND_APPROVED,
+                                                    \App\Models\UserNotification::TYPE_EXTEND_REJECTED,
+                                                ])
+                                                ->whereNull('read_at')
+                                                ->count();
+                                        @endphp
                                         <li {!! (request()->is('account/view-assets') ? ' class="active" aria-current="page"' : '') !!}>
                                             <a href="{{ route('view-assets') }}">
                                                 <x-icon type="checkmark" class="fa-fw" />
                                                 {{ trans('general.viewassets') }}
+                                                @if ($assetAlertCount > 0)
+                                                    <span class="label label-danger" style="margin-left: 6px;">
+                                                        {{ min($assetAlertCount, 99) }}
+                                                    </span>
+                                                @endif
                                             </a>
                                         </li>
                                         @endcan
@@ -853,10 +869,19 @@
                             </li>
                         @endcan
                             @can('viewPendingRequests')
+                                @php
+                                    $pendingCount = \App\Models\CheckoutRequest::query()
+                                        ->pendingApprovalCountForUser((int) auth()->id());
+                                @endphp
                                 <li{!! (request()->is('requests.index') ? ' class="active" aria-current="page"' : '') !!}>
                                     <a href="{{ route('requests.index') }}">
                                         <x-icon type="pending-requests" class="fa-fw"/>
                                         <span>{{ trans('general.pending_requests') }}</span>
+                                        @if ($pendingCount > 0)
+                                            <span class="badge badge-danger pull-right hidden-sm hidden-md" style="margin-top: 2px;">
+                                                {{ min($pendingCount, 99) }}
+                                            </span>
+                                        @endif
                                     </a>
                                 </li>
                                 <li{!! (request()->is('unaccepted-acceptances') ? ' class="active" aria-current="page"' : '') !!}>

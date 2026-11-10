@@ -8,7 +8,7 @@
         <a href="#" class="dropdown-toggle" data-toggle="dropdown" tabindex="-1" aria-haspopup="true" aria-expanded="false"
            data-tooltip="true" data-placement="bottom" data-title="{{ trans('general.notifications') }}">
             <x-icon type="bell" class="fa-fw" />
-            <span class="label label-danger">{{ $unread->count() }}</span>
+            <span class="label label-danger">{{ min($unread->count(), 99) }}</span>
             <span class="sr-only">{{ trans('general.notifications') }}</span>
         </a>
         <ul class="dropdown-menu">
@@ -17,7 +17,9 @@
                 <ul class="menu">
                     @foreach ($unread as $notification)
                         <li>
-                            <a href="{{ route('account.requested') }}" style="white-space: normal;">
+                            <a href="{{ $notification->targetUrl() }}" class="bell-notification-link"
+                               data-notification-id="{{ $notification->id }}"
+                               style="white-space: normal;">
                                 <strong>{{ $notification->title }}</strong>
                                 @if ($notification->body)
                                     <div class="text-muted">{{ $notification->body }}</div>
@@ -27,7 +29,40 @@
                     @endforeach
                 </ul>
             </li>
-            <li class="footer"><a href="{{ route('account.notifications.index') }}">查看全部消息</a></li>
+            <li class="footer">
+                <a href="{{ route('account.notifications.index') }}" id="bell-view-all">查看全部消息</a>
+            </li>
         </ul>
     </li>
+
+    <script>
+        $(function () {
+            // 点击单条通知 → 置已读 + 跳 targetUrl
+            $('.bell-notification-link').on('click', function (e) {
+                var $link = $(this);
+                var id = $link.data('notification-id');
+                e.preventDefault();
+                $.when(
+                    $.post("{{ route('account.notifications.read') }}", {
+                        notification: id,
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                    })
+                ).always(function () {
+                    window.location.href = $link.attr('href');
+                });
+            });
+
+            // 点「查看全部消息」→ 全部置已读后跳转
+            $('#bell-view-all').on('click', function (e) {
+                e.preventDefault();
+                $.when(
+                    $.post("{{ route('account.notifications.mark-read') }}", {
+                        _token: $('meta[name="csrf-token"]').attr('content'),
+                    })
+                ).always(function () {
+                    window.location.href = $(this).attr('href');
+                });
+            });
+        });
+    </script>
 @endif

@@ -1124,6 +1124,23 @@ class AssetsController extends Controller
         // 站内通知：告知申请人审批已通过。
         UserNotification::notifyRequesterApproved($checkoutRequest);
 
+        // 延期申请特殊处理：批准即视为生效，资产的 expected_checkin
+        // 更新为延期日期，不再走仓库出库流程（原资产已在使用中）。
+        if ($checkoutRequest->isExtension()) {
+            $asset = $checkoutRequest->extendedAsset;
+            if ($asset && $checkoutRequest->expected_return_date) {
+                $asset->update(['expected_checkin' => $checkoutRequest->expected_return_date]);
+            }
+            CheckoutRequest::whereKey($id)->update([
+                'state' => \App\Enums\CheckoutRequestState::Fulfilled->value,
+                'fulfilled_at' => now(),
+            ]);
+            UserNotification::notifyExtendApproved($checkoutRequest);
+
+            return redirect()->route('requests.index')
+                ->with('success', '延期已批准，资产归还日期已更新');
+        }
+
         return redirect()->route('requests.index')
             ->with('success', '已批准，申请已转交仓库管理员');
     }
@@ -1155,6 +1172,14 @@ class AssetsController extends Controller
         if (! $affected) {
             return redirect()->route('requests.index')
                 ->with('error', '该申请已被处理，请刷新后重试');
+        }
+
+        if ($checkoutRequest->isExtension()) {
+            // 延期申请拒绝：仅通知申请人，资产继续按原归还日期执行。
+            UserNotification::notifyExtendRejected($checkoutRequest);
+
+            return redirect()->route('requests.index')
+                ->with('success', '延期申请已拒绝，请通知申请人按时归还');
         }
 
         // 站内通知：告知申请人申请被退回，可在「我的申请」中修改或撤销。

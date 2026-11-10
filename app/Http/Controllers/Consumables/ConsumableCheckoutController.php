@@ -365,6 +365,11 @@ class ConsumableCheckoutController extends Controller
                 \Illuminate\Support\Facades\Log::warning('Bulk-fulfill event dispatch failed for request '.$requestId.': '.$e->getMessage());
             }
 
+            // 耗材出库后，通知抄送人（cc_user_ids）谁领了多少、用途是什么。
+            if ($checkoutRequest->isConsumableRequest()) {
+                UserNotification::notifyConsumableFulfilled($checkoutRequest);
+            }
+
             $fulfilled++;
         }
 

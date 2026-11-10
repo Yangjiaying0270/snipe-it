@@ -39,6 +39,12 @@ class CheckoutRequest extends Model
         'checkout_reason',
         'approval_status',
         'state',
+        'request_type',
+        'expected_return_date',
+        'extended_asset_id',
+        'original_checkout_request_id',
+        'purpose',
+        'cc_user_ids',
     ];
 
     protected $table = 'checkout_requests';
@@ -62,19 +68,55 @@ class CheckoutRequest extends Model
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'expected_return_date' => 'date',
         'canceled_at' => 'datetime',
         'fulfilled_at' => 'datetime',
         'quantity' => 'integer',
         'fulfilled_quantity' => 'integer',
         'state' => CheckoutRequestState::class,
         'approval_status' => CheckoutRequestApprovalStatus::class,
+        'cc_user_ids' => 'array',
     ];
 
     protected $attributes = [
         'state' => 'pending',
         'approval_status' => 'pending',
         'fulfilled_quantity' => 0,
+        'request_type' => 'normal',
     ];
+
+    /**
+     * True for normal asset-access requests that still need an approver.
+     */
+    public function isNormal(): bool
+    {
+        return $this->request_type === 'normal';
+    }
+
+    /**
+     * True for extension-of-return-date requests against an already-assigned asset.
+     */
+    public function isExtension(): bool
+    {
+        return $this->request_type === 'extend';
+    }
+
+    /**
+     * True for consumable requisitions that skip the approval step and go
+     * straight to the warehouse admin's fulfill queue (approval_status = auto_approved).
+     */
+    public function isConsumableRequest(): bool
+    {
+        return $this->request_type === 'consumable';
+    }
+
+    /**
+     * Convenience: has the approval stage already been bypassed?
+     */
+    public function isAutoApproved(): bool
+    {
+        return $this->approval_status === CheckoutRequestApprovalStatus::AutoApproved;
+    }
 
     /**
      * Remaining qty on this request. Requested minus fulfilled;
@@ -98,12 +140,13 @@ class CheckoutRequest extends Model
     }
 
     /**
-     * Approved and waiting for the warehouse admin to check the item out.
+     * Approved (or auto-approved for consumables), waiting for the
+     * warehouse admin to check the item out.
      */
     public function isAwaitingCheckout(): bool
     {
         return $this->state === CheckoutRequestState::Pending
-            && $this->approval_status === CheckoutRequestApprovalStatus::Approved;
+            && $this->approval_status->isAwaitingCheckout();
     }
 
     /**
@@ -314,6 +357,22 @@ class CheckoutRequest extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approver_id', 'id');
+    }
+
+    /**
+     * 延期申请所指向的已签出资产（request_type='extend'）。
+     */
+    public function extendedAsset(): BelongsTo
+    {
+        return $this->belongsTo(Asset::class, 'extended_asset_id', 'id');
+    }
+
+    /**
+     * 延期申请可选关联的原普通资产申请（request_type='extend'）。
+     */
+    public function originalRequest(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'original_checkout_request_id', 'id');
     }
 
     public function requestingUser()

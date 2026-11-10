@@ -367,7 +367,7 @@ return [
     'rtd' => '待分配',
     'requested_date' => '申领日期',
     'requested_assets' => '可申领名目',
-    'requested_assets_menu' => 'My Requests',
+    'requested_assets_menu' => '我的申请',
     'request_canceled' => '取消请求',
     'request_item' => '申领此项',
     'external_link_tooltip' => '外部链接到',

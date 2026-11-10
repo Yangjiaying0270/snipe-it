@@ -331,6 +331,20 @@ class ProfileController extends Controller
     }
 
     /**
+     * 单条通知置已读（用户从铃铛/弹窗点进某条时调用）。
+     */
+    public function markOneNotificationRead(int $notification): JsonResponse
+    {
+        $updated = UserNotification::query()
+            ->whereKey($notification)
+            ->where('user_id', (int) auth()->id())
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
+        return response()->json(['status' => 'success', 'updated' => $updated]);
+    }
+
+    /**
      * 消息列表：当前用户收到的全部站内通知（含已读），按时间倒序分页。
      * 登录弹窗只展示未读，这里是完整历史。
      */

@@ -9,13 +9,14 @@ namespace App\Enums;
  * answers "is the request still open", while this answers "which
  * stage of the approval flow the request sits in".
  *
- *   pending      Waiting for the approver picked by the requester.
- *   approved     Approved, waiting for the warehouse admin to check
- *                the item out.
- *   rejected     Returned to the requester, who may edit or cancel.
- *   fulfilled    The checkout was completed.
- *   invalidated  Closed automatically because someone else received
- *                the same asset first.
+ *   pending       Waiting for the approver picked by the requester.
+ *   approved      Approved, waiting for the warehouse admin to check
+ *                 the item out.
+ *   rejected      Returned to the requester, who may edit or cancel.
+ *   fulfilled     The checkout was completed.
+ *   invalidated   Closed automatically because someone else received
+ *                 the same asset first.
+ *   auto_approved 跳过审批直接进入出库队列（耗材申请、仓库直发等场景）。
  */
 enum CheckoutRequestApprovalStatus: string
 {
@@ -24,6 +25,7 @@ enum CheckoutRequestApprovalStatus: string
     case Rejected = 'rejected';
     case Fulfilled = 'fulfilled';
     case Invalidated = 'invalidated';
+    case AutoApproved = 'auto_approved';
 
     public function label(): string
     {
@@ -33,6 +35,7 @@ enum CheckoutRequestApprovalStatus: string
             self::Rejected => trans('general.approval_status_rejected'),
             self::Fulfilled => trans('general.approval_status_fulfilled'),
             self::Invalidated => trans('general.approval_status_invalidated'),
+            self::AutoApproved => trans('general.approval_status_auto_approved'),
         };
     }
 
@@ -47,6 +50,16 @@ enum CheckoutRequestApprovalStatus: string
             self::Rejected => 'danger',
             self::Fulfilled => 'success',
             self::Invalidated => 'default',
+            self::AutoApproved => 'info',
         };
+    }
+
+    /**
+     * 已经越过审批环节（approved 或 auto_approved），
+     * 等待仓库管理员执行实际出库。
+     */
+    public function isAwaitingCheckout(): bool
+    {
+        return in_array($this, [self::Approved, self::AutoApproved], true);
     }
 }

@@ -970,16 +970,20 @@ namespace App\Models{
  * @property-read int|null $calendar_events_count
  * @property-read \App\Models\Actionlog|null $checkoutActionlog
  * @property-read \App\Models\Location|null $checkoutLocation
+ * @property-read \App\Models\Asset|null $extendedAsset
  * @property-read \App\Models\User|null $fulfilledBy
  * @property-read mixed|null $calendar_end
  * @property-read mixed|null $calendar_start
  * @property-read string|null $name
+ * @property-read CheckoutRequest|null $originalRequest
  * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $requestable
  * @property-read \Illuminate\Database\Eloquent\Model|\Eloquent $requestedItem
  * @property-read \App\Models\User|null $user
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest awaitingApproval()
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest awaitingWarehouse()
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest canceled()
+ * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest consumableRequests()
+ * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest extensions()
  * @method static \Database\Factories\CheckoutRequestFactory factory($count = null, $state = [])
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest fulfilled()
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest newModelQuery()
@@ -988,6 +992,8 @@ namespace App\Models{
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest open()
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest orWhereMultipleColumns(array $columns, $term)
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest pending()
+ * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest pendingApprovalCountForUser(int $userId)
+ * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest pendingApprovalForUser(int $userId)
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest query()
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest textSearch($search)
  * @method static \App\Models\Builders\CheckoutRequestQueryBuilder<static>|CheckoutRequest whereApprovalStatus($value)

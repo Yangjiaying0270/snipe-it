@@ -3409,17 +3409,17 @@
         // 超管保留原有的签入/签出逻辑不变。
         if (permissions.approve) {
             var approveUrl = '{{ config('app.url') }}/requests/' + row.id + '/approve';
-            actions += ' <form method="POST" action="' + approveUrl + '" style="display:inline;margin:0">' +
+            actions += ' <form method="POST" action="' + approveUrl + '" style="display:inline;margin:0" class="request-approve-form">' +
                 '{{ csrf_field() }}' +
-                '<button type="submit" class="actions btn btn-sm btn-success" data-tooltip="true" title="批准">' +
+                '<button type="submit" class="actions btn btn-sm btn-success request-action-btn" data-tooltip="true" title="批准">' +
                 '<i class="fa fa-check fa-fw" aria-hidden="true"></i><span class="sr-only">批准</span></button>' +
                 '</form>';
         }
         if (permissions.reject) {
             var rejectUrl = '{{ config('app.url') }}/requests/' + row.id + '/reject';
-            actions += ' <form method="POST" action="' + rejectUrl + '" style="display:inline;margin:0">' +
+            actions += ' <form method="POST" action="' + rejectUrl + '" style="display:inline;margin:0" class="request-reject-form">' +
                 '{{ csrf_field() }}' +
-                '<button type="submit" class="actions btn btn-sm btn-warning" data-tooltip="true" title="退回">' +
+                '<button type="submit" class="actions btn btn-sm btn-warning request-action-btn" data-tooltip="true" title="退回">' +
                 '<i class="fa fa-undo fa-fw" aria-hidden="true"></i><span class="sr-only">退回</span></button>' +
                 '</form>';
         }
@@ -3665,7 +3665,47 @@
                 ' <span class="label label-warning">待签入</span>';
         }
 
+        // 延期归还按钮：仅当资产被判定为 extendable（已超期或临近到期
+        // 且没有 pending 延期申请）时出现。
+        if (row.can_extend) {
+            html += ' <a href="{{ config('app.url') }}/account/requests/' + row.id + '/extend" ' +
+                'class="btn btn-sm btn-warning" data-tooltip="true" title="提交延期申请">' +
+                '<i class="fas fa-clock fa-fw" aria-hidden="true"></i> 延期' +
+                '</a>';
+        }
+
         return html;
+    }
+
+    /**
+     * 资产归还状态 badge。颜色由后端 Asset::returnStatus() 返回：
+     *   success = 未到期
+     *   warning = 即将到期
+     *   danger  = 待归还（已逾期或今天到期）
+     *   default = 已提交延期/归还申请等中间态
+     */
+    function returnStatusFormatter(value, row) {
+        if (!row || !row.return_status) {
+            return '';
+        }
+
+        var status = row.return_status;
+        var colorMap = {
+            success: 'label-success',
+            warning: 'label-warning',
+            danger: 'label-danger',
+            default: 'label-default',
+        };
+        var cls = colorMap[status.color] || 'label-default';
+        var icon = status.overdue ? ' <i class="fas fa-exclamation-triangle"></i>' : '';
+        var title = status.due_days !== null
+            ? '距到期 ' + (status.due_days < 0 ? '逾期 ' + Math.abs(status.due_days) : status.due_days) + ' 天'
+            : '';
+
+        return '<span class="label ' + cls + '"' +
+            (title ? ' title="' + title + '"' : '') + '>' +
+            status.label + icon +
+            '</span>';
     }
 
     // 归还请求队列操作列。「签入」跳转标准 check-in 页面并携带
@@ -4687,6 +4727,18 @@
                     '<a class="btn btn-sm btn-danger disabled" data-tooltip="true" title="{{ trans('general.file_upload_status.file_not_found') }}"><x-icon type="delete" /><span class="sr-only">{{ trans('general.delete') }}</span></a>'
                 );
         })
+
+        // 需求 7：管理员审批列表 approve/reject 按钮 loading 状态。
+        // 提交时隐藏原图标，仅显示 spinner，禁用按钮防重复提交。
+        $(document).on('click', '.request-action-btn', function () {
+            var $btn = $(this);
+            if ($btn.prop('disabled')) {
+                return false;
+            }
+            $btn.prop('disabled', true);
+            $btn.find('i, .fa, .fas, .far, .fab').hide();
+            $btn.prepend('<i class="fa fa-spinner fa-spin fa-fw"></i>');
+        });
 
         return `<div class="row">${view}</div>`
     }
